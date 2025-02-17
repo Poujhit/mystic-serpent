@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Snake Game</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="game-container">
+      <div class="header">
+        <h1>Snake Game</h1>
+        <div class="stats">
+          <div class="score-box">Score: <span id="score">0</span></div>
+          <div class="high-score-box">
+            High Score: <span id="highScore">0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-area">
+        <div class="power-ups-panel">
+          <h3>Active Powers</h3>
+          <div id="activePowerUps"></div>
+        </div>
+
+        <div class="canvas-container">
+          <canvas id="gameCanvas" width="400" height="400"></canvas>
+          <div id="gameOver" class="game-over hidden">
+            <h2>Game Over!</h2>
+            <p>Final Score: <span id="finalScore">0</span></p>
+            <button id="restartButton">Play Again</button>
+          </div>
+          <div id="pauseOverlay" class="pause-overlay hidden">
+            <h2>Paused</h2>
+            <p>Press P to resume</p>
+          </div>
+        </div>
+
+        <div class="food-legend">
+          <h3>Power-Ups Guide</h3>
+          <ul>
+            <li>
+              <span class="food-dot normal"></span> Normal Food: 10 points
+            </li>
+            <li>
+              <span class="food-dot ghost"></span> Ghost Mode: Pass through
+              yourself (10s)
+            </li>
+            <li>
+              <span class="food-dot invincible"></span> Invincibility: Pass
+              through walls and self (5s)
+            </li>
+            <li>
+              <span class="food-dot double"></span> Double Points: Score twice
+              the points (8s)
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="controls">
+        <h3>Controls</h3>
+        <div class="controls-grid">
+          <div class="control-key">↑</div>
+          <div class="control-key">←</div>
+          <div class="control-key">↓</div>
+          <div class="control-key">→</div>
+          <div class="control-desc">Move</div>
+          <div class="control-key">P</div>
+          <div class="control-desc">Pause</div>
+          <div class="control-key">Space</div>
+          <div class="control-desc">Restart</div>
+        </div>
+      </div>
+    </div>
+    <script src="game.js"></script>
+  </body>
+</html>
