@@ -13,7 +13,8 @@
   <body>
     <div class="game-container">
       <div class="header">
-        <h1>Snake Game</h1>
+        <h1>Mystic Serpent</h1>
+        <div class="subtitle">A Magical Snake Adventure</div>
         <div class="stats">
           <div class="score-box">Score: <span id="score">0</span></div>
           <div class="high-score-box">
@@ -29,7 +30,7 @@
         </div>
 
         <div class="canvas-container">
-          <canvas id="gameCanvas" width="400" height="400"></canvas>
+          <canvas id="gameCanvas" width="600" height="400"></canvas>
           <div id="gameOver" class="game-over hidden">
             <h2>Game Over!</h2>
             <p>Final Score: <span id="finalScore">0</span></p>
@@ -45,19 +46,20 @@
           <h3>Power-Ups Guide</h3>
           <ul>
             <li>
-              <span class="food-dot normal"></span> Normal Food: 10 points
+              <span class="food-dot normal apple"></span>
+              Apple: 10 points
             </li>
             <li>
-              <span class="food-dot ghost"></span> Ghost Mode: Pass through
-              yourself (10s)
+              <span class="food-dot ghost orb"></span>
+              Ghost Orb: Pass through yourself (10s)
             </li>
             <li>
-              <span class="food-dot invincible"></span> Invincibility: Pass
-              through walls and self (5s)
+              <span class="food-dot invincible star"></span>
+              Star Power: Pass through walls and self (5s)
             </li>
             <li>
-              <span class="food-dot double"></span> Double Points: Score twice
-              the points (8s)
+              <span class="food-dot double gem"></span>
+              Crystal Gem: Score twice the points (8s)
             </li>
           </ul>
         </div>

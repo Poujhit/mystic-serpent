@@ -1,6 +1,8 @@
 class Snake {
   constructor() {
     this.gridSize = 20;
+    this.gridWidth = 30; // 600/20 = 30 cells wide
+    this.gridHeight = 20; // 400/20 = 20 cells high
     this.reset();
   }
 
@@ -20,11 +22,16 @@ class Snake {
     head.y += this.direction.y;
 
     // Wall collision handling
-    if (head.x < 0 || head.x >= 20 || head.y < 0 || head.y >= 20) {
+    if (
+      head.x < 0 ||
+      head.x >= this.gridWidth ||
+      head.y < 0 ||
+      head.y >= this.gridHeight
+    ) {
       if (this.invincible) {
         // Wrap around the board during invincibility
-        head.x = (head.x + 20) % 20;
-        head.y = (head.y + 20) % 20;
+        head.x = (head.x + this.gridWidth) % this.gridWidth;
+        head.y = (head.y + this.gridHeight) % this.gridHeight;
       } else {
         return false;
       }
@@ -52,29 +59,117 @@ class Snake {
   }
 
   draw(ctx, color = '#00ff00') {
-    ctx.fillStyle = color;
-    this.body.forEach((segment) => {
+    const radius = this.gridSize / 3;
+
+    // Draw body segments with rounded corners
+    for (let i = this.body.length - 1; i >= 0; i--) {
+      const segment = this.body[i];
+      const x = segment.x * this.gridSize;
+      const y = segment.y * this.gridSize;
+
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.roundRect(x, y, this.gridSize - 1, this.gridSize - 1, radius);
+      ctx.fill();
+
+      // Add segment connection if not last segment
+      if (i < this.body.length - 1) {
+        const nextSegment = this.body[i + 1];
+        const midX = ((segment.x + nextSegment.x) * this.gridSize) / 2;
+        const midY = ((segment.y + nextSegment.y) * this.gridSize) / 2;
+        ctx.fillRect(
+          Math.min(x, midX),
+          Math.min(y, midY),
+          Math.abs(x - midX) || this.gridSize - 1,
+          Math.abs(y - midY) || this.gridSize - 1
+        );
+      }
+    }
+
+    // Draw snake head with eyes
+    const head = this.body[0];
+    const headX = head.x * this.gridSize;
+    const headY = head.y * this.gridSize;
+
+    // Draw eyes
+    ctx.fillStyle = '#000';
+    const eyeSize = 3;
+    const eyeOffset = 5;
+
+    // Position eyes based on direction
+    if (this.direction.x === 1) {
+      // Right
       ctx.fillRect(
-        segment.x * this.gridSize,
-        segment.y * this.gridSize,
-        this.gridSize - 1,
-        this.gridSize - 1
+        headX + this.gridSize - eyeOffset,
+        headY + eyeOffset,
+        eyeSize,
+        eyeSize
       );
-    });
+      ctx.fillRect(
+        headX + this.gridSize - eyeOffset,
+        headY + this.gridSize - eyeOffset - eyeSize,
+        eyeSize,
+        eyeSize
+      );
+    } else if (this.direction.x === -1) {
+      // Left
+      ctx.fillRect(
+        headX + eyeOffset - eyeSize,
+        headY + eyeOffset,
+        eyeSize,
+        eyeSize
+      );
+      ctx.fillRect(
+        headX + eyeOffset - eyeSize,
+        headY + this.gridSize - eyeOffset - eyeSize,
+        eyeSize,
+        eyeSize
+      );
+    } else if (this.direction.y === 1) {
+      // Down
+      ctx.fillRect(
+        headX + eyeOffset,
+        headY + this.gridSize - eyeOffset,
+        eyeSize,
+        eyeSize
+      );
+      ctx.fillRect(
+        headX + this.gridSize - eyeOffset - eyeSize,
+        headY + this.gridSize - eyeOffset,
+        eyeSize,
+        eyeSize
+      );
+    } else {
+      // Up
+      ctx.fillRect(
+        headX + eyeOffset,
+        headY + eyeOffset - eyeSize,
+        eyeSize,
+        eyeSize
+      );
+      ctx.fillRect(
+        headX + this.gridSize - eyeOffset - eyeSize,
+        headY + eyeOffset - eyeSize,
+        eyeSize,
+        eyeSize
+      );
+    }
   }
 }
 
 class Food {
   constructor() {
     this.gridSize = 20;
+    this.gridWidth = 30; // Match Snake's grid dimensions
+    this.gridHeight = 20;
     this.position = { x: 0, y: 0 };
     this.type = 'normal';
     this.randomize();
   }
 
   randomize() {
-    this.position.x = Math.floor(Math.random() * 20);
-    this.position.y = Math.floor(Math.random() * 20);
+    this.position.x = Math.floor(Math.random() * this.gridWidth);
+    this.position.y = Math.floor(Math.random() * this.gridHeight);
     // 20% chance to spawn a power food
     if (Math.random() < 0.2) {
       this.type = this.getRandomPowerType();
@@ -89,25 +184,96 @@ class Food {
   }
 
   draw(ctx) {
-    const colors = {
-      normal: '#ff0000',
-      ghost: '#88ccff', // Light blue for ghost mode
-      invincible: '#00ff00', // Green for invincibility
-      double: '#ff00ff', // Purple for double points
-    };
-    ctx.fillStyle = colors[this.type];
-    ctx.fillRect(
-      this.position.x * this.gridSize,
-      this.position.y * this.gridSize,
-      this.gridSize - 1,
-      this.gridSize - 1
-    );
+    const x = this.position.x * this.gridSize;
+    const y = this.position.y * this.gridSize;
+    const size = this.gridSize - 1;
+    const halfSize = size / 2;
+    const quarterSize = size / 4;
+
+    ctx.save();
+    ctx.translate(x + halfSize, y + halfSize);
+
+    switch (this.type) {
+      case 'normal':
+        // Draw an apple
+        ctx.fillStyle = '#ff0000';
+        ctx.beginPath();
+        ctx.arc(0, 0, quarterSize * 1.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Stem
+        ctx.fillStyle = '#553311';
+        ctx.fillRect(-2, -quarterSize * 1.5, 4, 6);
+
+        // Leaf
+        ctx.fillStyle = '#00aa00';
+        ctx.beginPath();
+        ctx.ellipse(4, -quarterSize * 1.5, 6, 3, Math.PI / 4, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+
+      case 'ghost':
+        // Draw a glowing orb
+        const gradient = ctx.createRadialGradient(
+          0,
+          0,
+          0,
+          0,
+          0,
+          quarterSize * 2
+        );
+        gradient.addColorStop(0, '#ffffff');
+        gradient.addColorStop(0.5, '#88ccff');
+        gradient.addColorStop(1, '#4488ff');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(0, 0, quarterSize * 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+
+      case 'invincible':
+        // Draw a star
+        ctx.fillStyle = '#ffd700';
+        ctx.beginPath();
+        for (let i = 0; i < 5; i++) {
+          const angle = (i * 4 * Math.PI) / 5 - Math.PI / 2;
+          const radius = i === 0 ? quarterSize * 2 : quarterSize;
+          ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+        }
+        ctx.closePath();
+        ctx.fill();
+        break;
+
+      case 'double':
+        // Draw a gem
+        ctx.fillStyle = '#ff00ff';
+        ctx.beginPath();
+        ctx.moveTo(-quarterSize, 0);
+        ctx.lineTo(0, -quarterSize * 1.5);
+        ctx.lineTo(quarterSize, 0);
+        ctx.lineTo(0, quarterSize * 1.5);
+        ctx.closePath();
+        ctx.fill();
+
+        // Add shine
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-quarterSize / 2, -quarterSize / 2);
+        ctx.lineTo(0, -quarterSize);
+        ctx.stroke();
+        break;
+    }
+
+    ctx.restore();
   }
 }
 
 class Game {
   constructor() {
     this.canvas = document.getElementById('gameCanvas');
+    this.canvas.width = 600; // Increase width from 400 to 600
+    this.canvas.height = 400; // Back to original height
     this.ctx = this.canvas.getContext('2d');
     this.snake = new Snake();
     this.food = new Food();
