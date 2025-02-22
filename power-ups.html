@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mystic Serpent - Power-Ups Guide</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@300;400;500;600&family=Open+Sans:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        color: #e0e0e0;
+        font-family: 'Inter', 'Open Sans', sans-serif;
+        line-height: 1.7;
+        margin: 0;
+        padding: 20px;
+        font-size: 16px;
+        font-weight: 400;
+        letter-spacing: -0.011em;
+      }
+
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 30px;
+        border-radius: 15px;
+        border: 2px solid #4ecca3;
+      }
+
+      h1,
+      h2,
+      h3 {
+        font-family: 'Press Start 2P', cursive;
+        color: #4ecca3;
+        margin-top: 30px;
+        line-height: 1.4;
+      }
+
+      h1 {
+        text-align: center;
+        font-size: 24px;
+        margin-bottom: 40px;
+      }
+
+      h2 {
+        font-size: 16px;
+      }
+
+      h3 {
+        font-size: 14px;
+      }
+
+      .power-up {
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid #4ecca3;
+        border-radius: 8px;
+        padding: 25px;
+        margin-bottom: 25px;
+      }
+
+      .power-up-header {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 15px;
+      }
+
+      .emoji {
+        font-size: 32px;
+        width: 50px;
+        text-align: center;
+      }
+
+      .stats {
+        background: rgba(78, 204, 163, 0.1);
+        padding: 20px;
+        border-radius: 8px;
+        margin: 15px 0;
+        font-weight: 500;
+      }
+
+      .stats p {
+        margin: 8px 0;
+      }
+
+      code {
+        background: rgba(0, 0, 0, 0.3);
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-family: 'JetBrains Mono', monospace;
+        color: #88ccff;
+        font-size: 0.9em;
+        letter-spacing: 0;
+      }
+
+      .probability {
+        color: #4ecca3;
+        font-weight: 600;
+      }
+
+      .back-button {
+        display: inline-block;
+        background: #4ecca3;
+        color: #000;
+        padding: 10px 20px;
+        text-decoration: none;
+        border-radius: 5px;
+        font-family: 'Press Start 2P', cursive;
+        font-size: 14px;
+        margin-top: 20px;
+      }
+
+      .back-button:hover {
+        background: #3db892;
+      }
+
+      p {
+        margin: 12px 0;
+        font-size: 16px;
+      }
+
+      ol {
+        padding-left: 25px;
+      }
+
+      li {
+        margin: 12px 0;
+      }
+
+      @media (max-width: 768px) {
+        body {
+          font-size: 15px;
+          padding: 10px;
+        }
+
+        .container {
+          padding: 20px;
+        }
+
+        h1 {
+          font-size: 20px;
+        }
+
+        .emoji {
+          font-size: 28px;
+        }
+
+        .power-up {
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Power-Ups Documentation</h1>
+
+      <div class="power-up">
+        <div class="power-up-header">
+          <span class="emoji">🍎</span>
+          <h2>Normal Food</h2>
+        </div>
+        <div class="stats">
+          <p>Points: 10</p>
+          <p class="probability">Probability: 70% (Base spawn rate)</p>
+        </div>
+        <p>
+          The basic food type that appears most frequently. Increases snake
+          length by one segment and adds 10 points to the score.
+        </p>
+        <p>
+          Implementation: Spawns when the random number is greater than the
+          powerUpChance (0.3).
+        </p>
+      </div>
+
+      <div class="power-up">
+        <div class="power-up-header">
+          <span class="emoji">🔮</span>
+          <h2>Ghost Orb</h2>
+        </div>
+        <div class="stats">
+          <p>Points: 15</p>
+          <p>Duration: 10 seconds</p>
+          <p class="probability">Probability: ~5% (30% * 1/6 of power-ups)</p>
+        </div>
+        <p>
+          Allows the snake to pass through itself without collision. The snake
+          becomes semi-transparent to indicate the ghost state.
+        </p>
+        <p>
+          Implementation: Sets <code>snake.ghostMode = true</code> and applies
+          <code>globalAlpha = 0.5</code> for transparency.
+        </p>
+      </div>
+
+      <div class="power-up">
+        <div class="power-up-header">
+          <span class="emoji">⭐</span>
+          <h2>Star Power (Invincibility)</h2>
+        </div>
+        <div class="stats">
+          <p>Points: 15</p>
+          <p>Duration: 10 seconds</p>
+          <p class="probability">Probability: ~5% (30% * 1/6 of power-ups)</p>
+        </div>
+        <p>
+          Makes the snake invincible to wall collisions and self-collisions. The
+          snake turns golden to indicate invincibility.
+        </p>
+        <p>
+          Implementation: Sets <code>snake.invincible = true</code> and changes
+          snake color to <code>#ffd700</code>. Enables wall wrapping.
+        </p>
+      </div>
+
+      <div class="power-up">
+        <div class="power-up-header">
+          <span class="emoji">💎</span>
+          <h2>Crystal Gem (Double Points)</h2>
+        </div>
+        <div class="stats">
+          <p>Points: 20</p>
+          <p>Duration: 8 seconds</p>
+          <p class="probability">Probability: ~5% (30% * 1/6 of power-ups)</p>
+        </div>
+        <p>
+          Doubles all points earned while active. Affects points from all food
+          types.
+        </p>
+        <p>
+          Implementation: Multiplies point values by 2 during food collection
+          while power-up is active.
+        </p>
+      </div>
+
+      <div class="power-up">
+        <div class="power-up-header">
+          <span class="emoji">👑</span>
+          <h2>Ultimate Crown (Auto-pilot)</h2>
+        </div>
+        <div class="stats">
+          <p>Points: 25</p>
+          <p>Duration: 20 seconds</p>
+          <p class="probability">Probability: ~5% (30% * 1/6 of power-ups)</p>
+        </div>
+        <p>
+          Activates auto-pilot mode where the snake automatically navigates to
+          food using pathfinding algorithms.
+        </p>
+        <p>
+          Implementation: Uses <code>calculatePathToFood()</code> method with
+          Manhattan distance heuristic and collision avoidance.
+        </p>
+      </div>
+
+      <div class="power-up">
+        <div class="power-up-header">
+          <span class="emoji">✂️</span>
+          <h2>Shrink Ray</h2>
+        </div>
+        <div class="stats">
+          <p>Points: 25</p>
+          <p>Cooldown: 60 seconds</p>
+          <p class="probability">
+            Dynamic: Increases with snake length (up to 80% when length > 25)
+          </p>
+        </div>
+        <p>
+          Reduces snake length by 5 segments. Only spawns when snake length > 5
+          and not on cooldown.
+        </p>
+        <p>
+          Implementation: Probability scales with snake length:
+          <code>Math.min(0.4, snakeLength/25)</code> or 0.8 for length > 25.
+        </p>
+      </div>
+
+      <div class="power-up">
+        <div class="power-up-header">
+          <span class="emoji">💀</span>
+          <h2>Cursed Fruit</h2>
+        </div>
+        <div class="stats">
+          <p>Points: 200</p>
+          <p>Duration: 5 seconds</p>
+          <p class="probability">Probability: ~5% (30% * 1/6 of power-ups)</p>
+        </div>
+        <p>
+          High-risk, high-reward power-up that restricts visibility to a small
+          circle around the snake's head.
+        </p>
+        <p>
+          Implementation: Uses canvas <code>globalCompositeOperation</code> with
+          radial gradient to create a spotlight effect.
+        </p>
+      </div>
+
+      <h3>General Power-Up Mechanics</h3>
+      <div class="power-up">
+        <p>
+          Power-ups have a 30% chance to spawn instead of normal food (<code
+            >powerUpChance = 0.3</code
+          >).
+        </p>
+        <p>When a power-up spawns:</p>
+        <ol>
+          <li>
+            First checks if shrink power-up should spawn based on snake length
+          </li>
+          <li>
+            If not shrink, randomly selects from the available power-up types
+          </li>
+          <li>
+            Power-up timers are managed by the
+            <code>updatePowerUps()</code> method
+          </li>
+          <li>Multiple power-ups can be active simultaneously</li>
+        </ol>
+      </div>
+
+      <a href="index.html" class="back-button">Back to Game</a>
+    </div>
+  </body>
+</html>

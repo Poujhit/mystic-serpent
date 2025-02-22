@@ -295,6 +295,86 @@ body {
   text-align: center;
 }
 
+.power-up-indicator.ultimate {
+  background-color: rgba(255, 215, 0, 0.2);
+  border: 2px solid gold;
+  font-size: 0.9em;
+  font-weight: bold;
+  color: gold;
+  padding: 12px;
+  text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+  animation: ultimatePulse 1.5s infinite;
+}
+
+@keyframes ultimatePulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 10px gold;
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px gold;
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px gold;
+  }
+}
+
+.power-up-indicator.cursed {
+  background-color: rgba(102, 0, 0, 0.3);
+  border: 2px solid #660000;
+  color: #ff3333;
+  text-shadow: 0 0 5px rgba(255, 0, 0, 0.5);
+  animation: cursedPulse 2s infinite;
+}
+
+@keyframes cursedPulse {
+  0% {
+    box-shadow: 0 0 10px #660000;
+  }
+  50% {
+    box-shadow: 0 0 20px #ff0000;
+  }
+  100% {
+    box-shadow: 0 0 10px #660000;
+  }
+}
+
+/* Cursed mode styles */
+.cursed-mode {
+  position: relative;
+}
+
+.cursed-mode::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: black;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.cursed-mode #gameCanvas {
+  position: relative;
+  z-index: 1001;
+}
+
+.cursed-mode .power-up-indicator.cursed {
+  position: relative;
+  z-index: 1001;
+  background-color: rgba(102, 0, 0, 0.8);
+  border-color: #ff0000;
+}
+
+/* Update the cursed mode styles */
+.cursed-mode #gameCanvas.cursed {
+  border-color: transparent; /* Hide the border during cursed mode */
+}
+
 @media (max-width: 768px) {
   .game-container {
     padding: 3px;
@@ -347,4 +427,28 @@ body {
     min-width: 16px;
     font-size: 0.8em;
   }
+}
+
+/* Add these styles */
+.guide-link {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.guide-button {
+  display: inline-block;
+  background: rgba(78, 204, 163, 0.2);
+  color: #4ecca3;
+  padding: 8px 12px;
+  text-decoration: none;
+  border-radius: 5px;
+  font-family: 'Press Start 2P', cursive;
+  font-size: 0.6em;
+  border: 1px solid #4ecca3;
+  transition: all 0.3s ease;
+}
+
+.guide-button:hover {
+  background: rgba(78, 204, 163, 0.4);
+  transform: scale(1.05);
 }

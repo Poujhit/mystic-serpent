@@ -24,13 +24,33 @@ class Snake {
     const dx = foodPos.x - head.x;
     const dy = foodPos.y - head.y;
 
+    // Helper function to check if a position is safe
+    const isSafePosition = (pos) => {
+      return (
+        pos.x >= 0 &&
+        pos.x < this.gridWidth &&
+        pos.y >= 0 &&
+        pos.y < this.gridHeight &&
+        !this.body.some((segment) => segment.x === pos.x && segment.y === pos.y)
+      );
+    };
+
+    // Helper function to calculate distance to food
+    const getDistanceToFood = (pos) => {
+      return Math.abs(foodPos.x - pos.x) + Math.abs(foodPos.y - pos.y);
+    };
+
     // Try all possible moves and pick the best valid one
     const possibleMoves = [
-      { x: Math.sign(dx), y: 0 }, // Horizontal
-      { x: 0, y: Math.sign(dy) }, // Vertical
-      { x: 0, y: Math.sign(dy) }, // Alternative 1
-      { x: Math.sign(dx), y: 0 }, // Alternative 2
+      { x: 1, y: 0 }, // Right
+      { x: -1, y: 0 }, // Left
+      { x: 0, y: 1 }, // Down
+      { x: 0, y: -1 }, // Up
     ];
+
+    // Score each possible move
+    let bestMove = null;
+    let bestScore = -Infinity;
 
     // Find a valid move that doesn't cause collision
     for (const move of possibleMoves) {
@@ -39,52 +59,50 @@ class Snake {
         y: head.y + move.y,
       };
 
-      // Check wall collision
-      if (
-        nextPos.x < 0 ||
-        nextPos.x >= this.gridWidth ||
-        nextPos.y < 0 ||
-        nextPos.y >= this.gridHeight
-      ) {
+      if (!isSafePosition(nextPos)) {
         continue;
       }
 
-      // Check self collision
-      if (
-        this.body.some(
-          (segment) => segment.x === nextPos.x && segment.y === nextPos.y
-        )
-      ) {
-        continue;
+      // Calculate score for this move
+      let score = 0;
+
+      // Higher score for moves that get us closer to food
+      const currentDistance = getDistanceToFood(head);
+      const newDistance = getDistanceToFood(nextPos);
+      if (newDistance < currentDistance) {
+        score += 2;
       }
 
-      // Valid move found
-      return move;
+      // Prioritize horizontal movement when food is more horizontal
+      if (Math.abs(dx) > Math.abs(dy)) {
+        if ((dx > 0 && move.x > 0) || (dx < 0 && move.x < 0)) {
+          score += 1;
+        }
+      } else {
+        // Prioritize vertical movement when food is more vertical
+        if ((dy > 0 && move.y > 0) || (dy < 0 && move.y < 0)) {
+          score += 1;
+        }
+      }
+
+      // Update best move if this score is higher
+      if (score > bestScore) {
+        bestScore = score;
+        bestMove = move;
+      }
     }
 
-    // If no valid move found, try to find any safe move
-    const safeDirections = [
-      { x: 1, y: 0 },
-      { x: -1, y: 0 },
-      { x: 0, y: 1 },
-      { x: 0, y: -1 },
-    ];
+    // Return best move if found
+    if (bestMove) return bestMove;
 
-    for (const move of safeDirections) {
+    // If no valid move found, try to find any safe move
+    for (const move of possibleMoves) {
       const nextPos = {
         x: head.x + move.x,
         y: head.y + move.y,
       };
 
-      if (
-        nextPos.x >= 0 &&
-        nextPos.x < this.gridWidth &&
-        nextPos.y >= 0 &&
-        nextPos.y < this.gridHeight &&
-        !this.body.some(
-          (segment) => segment.x === nextPos.x && segment.y === nextPos.y
-        )
-      ) {
+      if (isSafePosition(nextPos)) {
         return move;
       }
     }
@@ -146,6 +164,18 @@ class Snake {
     this.lastTailPosition = { ...this.body[this.body.length - 1] };
   }
 
+  shrink() {
+    // Only shrink if length is > 5
+    if (this.body.length > 5) {
+      // Remove last five segments
+      for (let i = 0; i < 5; i++) {
+        this.body.pop();
+      }
+      return true;
+    }
+    return false;
+  }
+
   draw(ctx, color = '#00ff00') {
     const radius = this.gridSize / 3;
 
@@ -184,7 +214,13 @@ class Snake {
     const drawSegment = (x, y) => {
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.roundRect(x, y, this.gridSize - 1, this.gridSize - 1, radius);
+      ctx.roundRect(
+        x,
+        y,
+        this.gridSize - 1,
+        this.gridSize - 1,
+        this.gridSize / 3
+      );
       ctx.fill();
     };
 
@@ -193,8 +229,8 @@ class Snake {
       const segment = this.body[i];
 
       // Main position
-      const x = segment.x * this.gridSize;
-      const y = segment.y * this.gridSize;
+      const x = segment.x * this.gridSize + (this.gridSize - this.gridSize) / 2;
+      const y = segment.y * this.gridSize + (this.gridSize - this.gridSize) / 2;
       drawSegment(x, y);
 
       // Draw wrapped positions if near edges
@@ -213,8 +249,8 @@ class Snake {
 
     // Draw snake head
     const head = this.body[0];
-    const headX = head.x * this.gridSize;
-    const headY = head.y * this.gridSize;
+    const headX = head.x * this.gridSize + (this.gridSize - this.gridSize) / 2;
+    const headY = head.y * this.gridSize + (this.gridSize - this.gridSize) / 2;
 
     // Create gradient for head
     const headGradient = ctx.createLinearGradient(
@@ -228,91 +264,59 @@ class Snake {
 
     ctx.fillStyle = headGradient;
     ctx.beginPath();
-    ctx.roundRect(headX, headY, this.gridSize - 1, this.gridSize - 1, radius);
+    ctx.roundRect(
+      headX,
+      headY,
+      this.gridSize - 1,
+      this.gridSize - 1,
+      this.gridSize / 3
+    );
     ctx.fill();
 
     // Draw eyes
     ctx.fillStyle = '#fff'; // White background for eyes
-    const eyeSize = 4;
-    const eyeOffset = 6;
-    const pupilSize = 2;
+    const eyeSize = this.gridSize / 4;
+    const eyeOffset = this.gridSize / 6;
+    const pupilSize = eyeSize / 2;
 
     // Position eyes based on direction
-    if (this.direction.x === 1) {
-      // Right
+    if (this.direction.x !== 0) {
+      // Horizontal movement
       this.drawEye(
         ctx,
-        headX + this.gridSize - eyeOffset,
+        headX + this.gridSize / 2 - eyeSize - eyeOffset,
         headY + eyeOffset,
         eyeSize,
         pupilSize,
-        1
+        this.direction.x
       );
       this.drawEye(
         ctx,
-        headX + this.gridSize - eyeOffset,
-        headY + this.gridSize - eyeOffset - eyeSize,
+        headX + this.gridSize / 2 - eyeSize - eyeOffset,
+        headY + this.gridSize - eyeSize - eyeOffset,
         eyeSize,
         pupilSize,
-        1
-      );
-    } else if (this.direction.x === -1) {
-      // Left
-      this.drawEye(
-        ctx,
-        headX + eyeOffset - eyeSize,
-        headY + eyeOffset,
-        eyeSize,
-        pupilSize,
-        -1
-      );
-      this.drawEye(
-        ctx,
-        headX + eyeOffset - eyeSize,
-        headY + this.gridSize - eyeOffset - eyeSize,
-        eyeSize,
-        pupilSize,
-        -1
-      );
-    } else if (this.direction.y === 1) {
-      // Down
-      this.drawEye(
-        ctx,
-        headX + eyeOffset,
-        headY + this.gridSize - eyeOffset,
-        eyeSize,
-        pupilSize,
-        0,
-        1
-      );
-      this.drawEye(
-        ctx,
-        headX + this.gridSize - eyeOffset - eyeSize,
-        headY + this.gridSize - eyeOffset,
-        eyeSize,
-        pupilSize,
-        0,
-        1
+        this.direction.x
       );
     } else {
-      // Up
+      // Vertical movement
       this.drawEye(
         ctx,
         headX + eyeOffset,
-        headY + eyeOffset - eyeSize,
+        headY + this.gridSize / 2 - eyeSize - eyeOffset,
         eyeSize,
         pupilSize,
         0,
-        -1
+        this.direction.y
       );
       this.drawEye(
         ctx,
-        headX + this.gridSize - eyeOffset - eyeSize,
-        headY + eyeOffset - eyeSize,
+        headX + this.gridSize - eyeSize - eyeOffset,
+        headY + this.gridSize / 2 - eyeSize - eyeOffset,
         eyeSize,
         pupilSize,
         0,
-        -1
+        this.direction.y
       );
     }
   }
@@ -345,27 +349,54 @@ class Food {
     this.gridHeight = 20;
     this.position = { x: 0, y: 0 };
     this.type = 'normal';
-    this.powerUpChance = 0.3; // Increase chance to 30%
+    this.powerUpChance = 0.3;
+    this.lastShrinkTime = 0;
+    this.shrinkCooldown = 60000; // 1 minute cooldown
     this.randomize();
   }
 
   randomize() {
     this.position.x = Math.floor(Math.random() * this.gridWidth);
     this.position.y = Math.floor(Math.random() * this.gridHeight);
+
+    // Get current snake length from game instance
+    const snakeLength = window.game?.snake?.body?.length || 1;
+
+    // Calculate shrink spawn probability based on snake length
+    const shouldTryShrink = () => {
+      // Don't spawn shrink if snake is too short or if it's on cooldown
+      if (
+        snakeLength <= 5 ||
+        Date.now() - this.lastShrinkTime < this.shrinkCooldown
+      ) {
+        return false;
+      }
+
+      // Increase probability as snake gets longer
+      const baseProb = snakeLength > 25 ? 0.8 : Math.min(0.4, snakeLength / 25);
+      return Math.random() < baseProb;
+    };
+
     // 30% chance to spawn a power food
     if (Math.random() < this.powerUpChance) {
-      this.type = this.getRandomPowerType();
+      // First check if we should spawn shrink power-up
+      if (shouldTryShrink()) {
+        this.type = 'shrink';
+      } else {
+        // Get all power types including cursed
+        const powerTypes = [
+          'ghost',
+          'invincible',
+          'double',
+          'ultimate',
+          'cursed',
+          'shrink',
+        ];
+        this.type = powerTypes[Math.floor(Math.random() * powerTypes.length)];
+      }
     } else {
       this.type = 'normal';
     }
-    console.log('Spawned food type:', this.type); // Debug log
-  }
-
-  getRandomPowerType() {
-    const powerTypes = ['ghost', 'invincible', 'double', 'ultimate'];
-    // Ensure each power-up has equal chance
-    const randomIndex = Math.floor(Math.random() * powerTypes.length);
-    return powerTypes[randomIndex];
   }
 
   draw(ctx) {
@@ -401,6 +432,12 @@ class Food {
       case 'ultimate':
         ctx.fillText('👑', 0, 0);
         break;
+      case 'shrink':
+        ctx.fillText('✂️', 0, 0); // Scissors emoji - represents cutting/reducing
+        break;
+      case 'cursed':
+        ctx.fillText('💀', 0, 0);
+        break;
     }
 
     ctx.restore();
@@ -426,6 +463,7 @@ class Game {
       invincible: { active: false, timeLeft: 0 },
       double: { active: false, timeLeft: 0 },
       ultimate: { active: false, timeLeft: 0 },
+      cursed: { active: false, timeLeft: 0 },
     };
     this.lastTime = Date.now();
     this.paused = false;
@@ -463,6 +501,17 @@ class Game {
     document.getElementById('restartButton').addEventListener('click', () => {
       this.restart();
     });
+
+    // Add event listener for power-ups guide link
+    document
+      .getElementById('powerUpsGuideLink')
+      .addEventListener('click', (e) => {
+        // Pause the game when guide is opened
+        if (!this.gameOver) {
+          this.togglePause();
+        }
+      });
+
     this.gameLoop();
   }
 
@@ -548,7 +597,7 @@ class Game {
         break;
       case 'invincible':
         points = 15;
-        this.activatePowerUp('invincible', 5000);
+        this.activatePowerUp('invincible', 10000);
         break;
       case 'double':
         points = 20;
@@ -561,6 +610,16 @@ class Game {
           this.snake.autoPilot = true;
           this.activatePowerUp('ultimate', 20000);
         }
+        break;
+      case 'shrink':
+        if (this.snake.body.length > 5 && this.snake.shrink()) {
+          points = 25; // Higher points for successful shrink
+          this.food.lastShrinkTime = Date.now(); // Start cooldown
+        }
+        break;
+      case 'cursed':
+        points = 200;
+        this.activatePowerUp('cursed', 5000); // 5 seconds of dark mode
         break;
     }
 
@@ -679,18 +738,97 @@ class Game {
   draw() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // Draw snake with effects
+    // If cursed mode is active, darken the entire website first
+    if (this.powerUps.cursed.active) {
+      document.body.classList.add('cursed-mode');
+      // Hide canvas border during cursed mode
+      this.canvas.classList.add('cursed');
+    } else {
+      document.body.classList.remove('cursed-mode');
+      this.canvas.classList.remove('cursed');
+    }
+
+    // Draw auto-pilot countdown in background first
+    if (this.powerUps.ultimate.active) {
+      const timeLeft = Math.ceil(this.powerUps.ultimate.timeLeft / 1000);
+      this.ctx.save();
+      this.ctx.fillStyle = 'rgba(255, 215, 0, 0.1)';
+      this.ctx.font = 'bold 120px Arial';
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      const centerX = this.canvas.width / 2;
+      const centerY = this.canvas.height / 2;
+      this.ctx.shadowColor = 'rgba(255, 215, 0, 0.3)';
+      this.ctx.shadowBlur = 20;
+      this.ctx.fillText(timeLeft.toString(), centerX, centerY);
+      this.ctx.restore();
+    }
+
+    // Draw snake and food first
     if (this.powerUps.ghost.active) {
       this.ctx.globalAlpha = 0.5;
     }
     if (this.powerUps.invincible.active) {
-      this.snake.draw(this.ctx, '#ffd700'); // Gold color for invincibility
+      this.snake.draw(this.ctx, '#ffd700');
     } else {
       this.snake.draw(this.ctx);
     }
     this.ctx.globalAlpha = 1;
-
     this.food.draw(this.ctx);
+
+    // Create dark overlay if cursed mode is active
+    if (this.powerUps.cursed.active) {
+      // Draw dark overlay
+      this.ctx.fillStyle = 'rgba(0, 0, 0, 1)'; // Completely black
+      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+      // Create a light circle around snake head
+      const head = this.snake.body[0];
+      const centerX = head.x * this.snake.gridSize + this.snake.gridSize / 2;
+      const centerY = head.y * this.snake.gridSize + this.snake.gridSize / 2;
+      const radius = this.snake.gridSize * 2.5; // Slightly larger visible area
+
+      // Create radial gradient for smooth light effect
+      const gradient = this.ctx.createRadialGradient(
+        centerX,
+        centerY,
+        0,
+        centerX,
+        centerY,
+        radius
+      );
+      gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      gradient.addColorStop(1, 'rgba(0, 0, 0, 1)');
+
+      // Create light circle by clearing the dark overlay
+      this.ctx.save();
+      this.ctx.globalCompositeOperation = 'destination-out';
+      this.ctx.fillStyle = gradient;
+      this.ctx.beginPath();
+      this.ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.restore();
+
+      // Redraw the snake and food in the visible area with eerie effect
+      const visibleArea = new Path2D();
+      visibleArea.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      this.ctx.save();
+      this.ctx.clip(visibleArea);
+      this.snake.draw(this.ctx, '#660000');
+      this.food.draw(this.ctx);
+      this.ctx.restore();
+
+      // Draw cursed timer in the visible area
+      const timeLeft = Math.ceil(this.powerUps.cursed.timeLeft / 1000);
+      this.ctx.save();
+      this.ctx.font = 'bold 24px Arial';
+      this.ctx.fillStyle = '#ff0000';
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'top';
+      this.ctx.fillText(`${timeLeft}s`, centerX, centerY - radius);
+      this.ctx.restore();
+    }
+
     this.drawPowerUpIndicators();
   }
 
@@ -702,8 +840,17 @@ class Game {
       if (power.active) {
         const timeLeft = Math.ceil(power.timeLeft / 1000);
         const indicator = document.createElement('div');
-        indicator.className = 'power-up-indicator';
-        indicator.textContent = `${type.toUpperCase()}: ${timeLeft}s`;
+        indicator.className = `power-up-indicator ${type}`;
+
+        // Special formatting for ultimate power-up
+        if (type === 'ultimate') {
+          indicator.innerHTML = `
+            <div>🎮 AUTO-PILOT ACTIVE 🎮</div>
+            <div style="font-size: 1.2em; margin-top: 5px;">${timeLeft}s</div>
+          `;
+        } else {
+          indicator.textContent = `${type.toUpperCase()}: ${timeLeft}s`;
+        }
         container.appendChild(indicator);
       }
     }
