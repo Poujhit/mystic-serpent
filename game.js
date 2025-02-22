@@ -571,9 +571,22 @@ class Game {
     this.snake.ghostMode = this.powerUps.ghost.active;
     this.snake.invincible = this.powerUps.invincible.active;
 
-    // Always call snake.update() and only check return value if not invincible
+    // Check collision result
     const updateResult = this.snake.update();
-    if (!this.snake.invincible && !updateResult) {
+
+    // End game if collision occurs during cursed mode or when not invincible
+    if (
+      (!this.snake.invincible && !updateResult) ||
+      (this.powerUps.cursed.active && !updateResult)
+    ) {
+      // End cursed mode immediately
+      if (this.powerUps.cursed.active) {
+        this.powerUps.cursed.active = false;
+        this.powerUps.cursed.timeLeft = 0;
+        document.body.classList.remove('cursed-mode');
+        this.canvas.classList.remove('cursed');
+      }
+
       this.gameOver = true;
       this.gameOverElement.classList.remove('hidden');
       this.handleGameOver();
