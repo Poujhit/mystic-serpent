@@ -4,6 +4,8 @@ class Snake {
     this.gridWidth = 30; // 600/20 = 30 cells wide
     this.gridHeight = 20; // 400/20 = 20 cells high
     this.reset();
+    this.growthAnimation = null;
+    this.lastTailPosition = null;
   }
 
   reset() {
@@ -56,10 +58,45 @@ class Snake {
 
   grow() {
     this.grown = true;
+    // Store the last tail position for animation
+    this.lastTailPosition = { ...this.body[this.body.length - 1] };
   }
 
   draw(ctx, color = '#00ff00') {
     const radius = this.gridSize / 3;
+
+    // Draw growth animation if active
+    if (this.lastTailPosition) {
+      const growthProgress = (Date.now() - this.growthAnimation) / 200; // 200ms animation
+      if (growthProgress <= 1) {
+        const currentTail = this.body[this.body.length - 1];
+        const x = currentTail.x * this.gridSize;
+        const y = currentTail.y * this.gridSize;
+        const lastX = this.lastTailPosition.x * this.gridSize;
+        const lastY = this.lastTailPosition.y * this.gridSize;
+
+        // Interpolate between last and current position
+        const animX = lastX + (x - lastX) * growthProgress;
+        const animY = lastY + (y - lastY) * growthProgress;
+
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 1 - growthProgress;
+        ctx.beginPath();
+        ctx.roundRect(
+          animX,
+          animY,
+          this.gridSize - 1,
+          this.gridSize - 1,
+          radius
+        );
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      } else {
+        this.lastTailPosition = null;
+        this.growthAnimation = null;
+      }
+    }
+
     const drawSegment = (x, y) => {
       ctx.fillStyle = color;
       ctx.beginPath();
@@ -394,6 +431,15 @@ class Game {
 
   handleFoodCollection() {
     let points = 0;
+    const foodPos = {
+      x: this.food.position.x * this.snake.gridSize + this.snake.gridSize / 2,
+      y: this.food.position.y * this.snake.gridSize + this.snake.gridSize / 2,
+    };
+
+    // Create food collection animation without affecting game timing
+    requestAnimationFrame(() => {
+      this.createFoodCollectionEffect(foodPos, this.food.type);
+    });
 
     switch (this.food.type) {
       case 'normal':
@@ -401,25 +447,99 @@ class Game {
         break;
       case 'ghost':
         points = 15;
-        this.activatePowerUp('ghost', 10000); // 10 seconds of ghost mode
+        this.activatePowerUp('ghost', 10000);
         break;
       case 'invincible':
         points = 15;
-        this.activatePowerUp('invincible', 5000); // 5 seconds of invincibility
+        this.activatePowerUp('invincible', 5000);
         break;
       case 'double':
         points = 20;
-        this.activatePowerUp('double', 8000); // 8 seconds of double points
+        this.activatePowerUp('double', 8000);
         break;
     }
 
-    // Double the points if double points power-up is active
     if (this.powerUps.double.active) {
       points *= 2;
     }
 
     this.score += points;
     this.scoreElement.textContent = this.score;
+
+    // Only call grow once and set animation time
+    this.snake.growthAnimation = Date.now();
+    this.food.randomize();
+  }
+
+  createFoodCollectionEffect(pos, foodType) {
+    const particles = [];
+    const particleCount = 8; // Reduced particle count for minimalism
+    const colors = {
+      normal: ['#ff4444'], // Single crisp color for each type
+      ghost: ['#6666ff'],
+      invincible: ['#ffcc00'],
+      double: ['#00ff88'],
+    };
+
+    for (let i = 0; i < particleCount; i++) {
+      const angle = (i / particleCount) * Math.PI * 2;
+      const color = colors[foodType][0];
+      const speed = 4; // Fixed speed for consistent animation
+      particles.push({
+        x: pos.x,
+        y: pos.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: 4, // Fixed size for consistency
+        life: 1,
+        color: color,
+      });
+    }
+
+    let lastTime = performance.now();
+    const animate = (currentTime) => {
+      const allParticlesDead = particles.every((p) => p.life <= 0);
+      if (allParticlesDead) return;
+
+      const deltaTime = (currentTime - lastTime) / 16;
+      lastTime = currentTime;
+
+      this.ctx.save();
+      particles.forEach((p) => {
+        if (p.life > 0) {
+          p.x += p.vx * deltaTime;
+          p.y += p.vy * deltaTime;
+          p.life -= 0.04 * deltaTime; // Faster fade out
+
+          // Draw particle with minimal glow
+          this.ctx.shadowColor = p.color;
+          this.ctx.shadowBlur = 4;
+          this.ctx.fillStyle = p.color;
+          this.ctx.globalAlpha = p.life;
+
+          // Draw as small circle for clean look
+          this.ctx.beginPath();
+          this.ctx.arc(p.x, p.y, p.size / 2, 0, Math.PI * 2);
+          this.ctx.fill();
+        }
+      });
+      this.ctx.restore();
+
+      requestAnimationFrame(animate);
+    };
+
+    requestAnimationFrame(animate);
+
+    // Flash effect
+    this.ctx.save();
+    this.ctx.fillStyle = colors[foodType][0];
+    this.ctx.globalAlpha = 0.3;
+    this.ctx.shadowColor = colors[foodType][0];
+    this.ctx.shadowBlur = 10;
+    this.ctx.beginPath();
+    this.ctx.arc(pos.x, pos.y, this.snake.gridSize, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.restore();
   }
 
   activatePowerUp(type, duration) {
