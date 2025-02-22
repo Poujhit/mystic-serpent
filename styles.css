@@ -123,39 +123,9 @@ body {
   height: 20px;
   display: inline-block;
   margin-right: 10px;
-  position: relative;
-}
-
-.food-dot.apple::after {
-  content: '🍎';
-  position: absolute;
-  top: -2px;
-  left: 0;
   font-size: 16px;
-}
-
-.food-dot.orb::after {
-  content: '🔮';
-  position: absolute;
-  top: -2px;
-  left: 0;
-  font-size: 16px;
-}
-
-.food-dot.star::after {
-  content: '⭐';
-  position: absolute;
-  top: -2px;
-  left: 0;
-  font-size: 16px;
-}
-
-.food-dot.gem::after {
-  content: '💎';
-  position: absolute;
-  top: -2px;
-  left: 0;
-  font-size: 16px;
+  line-height: 20px;
+  text-align: center;
 }
 
 .food-dot.normal,

@@ -60,100 +60,160 @@ class Snake {
 
   draw(ctx, color = '#00ff00') {
     const radius = this.gridSize / 3;
-
-    // Draw body segments with rounded corners
-    for (let i = this.body.length - 1; i >= 0; i--) {
-      const segment = this.body[i];
-      const x = segment.x * this.gridSize;
-      const y = segment.y * this.gridSize;
-
+    const drawSegment = (x, y) => {
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.roundRect(x, y, this.gridSize - 1, this.gridSize - 1, radius);
       ctx.fill();
+    };
 
-      // Add segment connection if not last segment
-      if (i < this.body.length - 1) {
-        const nextSegment = this.body[i + 1];
-        const midX = ((segment.x + nextSegment.x) * this.gridSize) / 2;
-        const midY = ((segment.y + nextSegment.y) * this.gridSize) / 2;
-        ctx.fillRect(
-          Math.min(x, midX),
-          Math.min(y, midY),
-          Math.abs(x - midX) || this.gridSize - 1,
-          Math.abs(y - midY) || this.gridSize - 1
-        );
+    // Draw body segments with wrapped positions
+    for (let i = this.body.length - 1; i >= 0; i--) {
+      const segment = this.body[i];
+
+      // Main position
+      const x = segment.x * this.gridSize;
+      const y = segment.y * this.gridSize;
+      drawSegment(x, y);
+
+      // Draw wrapped positions if near edges
+      if (segment.x === 0) {
+        drawSegment(x + this.gridWidth * this.gridSize, y); // Right wrap
+      } else if (segment.x === this.gridWidth - 1) {
+        drawSegment(x - this.gridWidth * this.gridSize, y); // Left wrap
+      }
+
+      if (segment.y === 0) {
+        drawSegment(x, y + this.gridHeight * this.gridSize); // Bottom wrap
+      } else if (segment.y === this.gridHeight - 1) {
+        drawSegment(x, y - this.gridHeight * this.gridSize); // Top wrap
       }
     }
 
-    // Draw snake head with eyes
+    // Draw snake head
     const head = this.body[0];
     const headX = head.x * this.gridSize;
     const headY = head.y * this.gridSize;
 
+    // Create gradient for head
+    const headGradient = ctx.createLinearGradient(
+      headX,
+      headY,
+      headX + this.gridSize,
+      headY + this.gridSize
+    );
+    headGradient.addColorStop(0, '#008000'); // Medium green
+    headGradient.addColorStop(1, color); // Light green
+
+    ctx.fillStyle = headGradient;
+    ctx.beginPath();
+    ctx.roundRect(headX, headY, this.gridSize - 1, this.gridSize - 1, radius);
+    ctx.fill();
+
     // Draw eyes
-    ctx.fillStyle = '#000';
-    const eyeSize = 3;
-    const eyeOffset = 5;
+    ctx.fillStyle = '#fff'; // White background for eyes
+    const eyeSize = 4;
+    const eyeOffset = 6;
+    const pupilSize = 2;
 
     // Position eyes based on direction
     if (this.direction.x === 1) {
       // Right
-      ctx.fillRect(
+      this.drawEye(
+        ctx,
         headX + this.gridSize - eyeOffset,
         headY + eyeOffset,
         eyeSize,
-        eyeSize
+        pupilSize,
+        1
       );
-      ctx.fillRect(
+      this.drawEye(
+        ctx,
         headX + this.gridSize - eyeOffset,
         headY + this.gridSize - eyeOffset - eyeSize,
         eyeSize,
-        eyeSize
+        pupilSize,
+        1
       );
     } else if (this.direction.x === -1) {
       // Left
-      ctx.fillRect(
+      this.drawEye(
+        ctx,
         headX + eyeOffset - eyeSize,
         headY + eyeOffset,
         eyeSize,
-        eyeSize
+        pupilSize,
+        -1
       );
-      ctx.fillRect(
+      this.drawEye(
+        ctx,
         headX + eyeOffset - eyeSize,
         headY + this.gridSize - eyeOffset - eyeSize,
         eyeSize,
-        eyeSize
+        pupilSize,
+        -1
       );
     } else if (this.direction.y === 1) {
       // Down
-      ctx.fillRect(
+      this.drawEye(
+        ctx,
         headX + eyeOffset,
         headY + this.gridSize - eyeOffset,
         eyeSize,
-        eyeSize
+        pupilSize,
+        0,
+        1
       );
-      ctx.fillRect(
+      this.drawEye(
+        ctx,
         headX + this.gridSize - eyeOffset - eyeSize,
         headY + this.gridSize - eyeOffset,
         eyeSize,
-        eyeSize
+        pupilSize,
+        0,
+        1
       );
     } else {
       // Up
-      ctx.fillRect(
+      this.drawEye(
+        ctx,
         headX + eyeOffset,
         headY + eyeOffset - eyeSize,
         eyeSize,
-        eyeSize
+        pupilSize,
+        0,
+        -1
       );
-      ctx.fillRect(
+      this.drawEye(
+        ctx,
         headX + this.gridSize - eyeOffset - eyeSize,
         headY + eyeOffset - eyeSize,
         eyeSize,
-        eyeSize
+        pupilSize,
+        0,
+        -1
       );
     }
+  }
+
+  drawEye(ctx, x, y, size, pupilSize, dirX = 0, dirY = 0) {
+    // Draw white of eye
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.roundRect(x, y, size, size, size / 2);
+    ctx.fill();
+
+    // Draw pupil
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(
+      x + size / 2 + dirX * (size / 4),
+      y + size / 2 + dirY * (size / 4),
+      pupilSize,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
   }
 }
 
@@ -188,80 +248,25 @@ class Food {
     const y = this.position.y * this.gridSize;
     const size = this.gridSize - 1;
     const halfSize = size / 2;
-    const quarterSize = size / 4;
 
     ctx.save();
     ctx.translate(x + halfSize, y + halfSize);
+    ctx.font = `${this.gridSize}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
 
     switch (this.type) {
       case 'normal':
-        // Draw an apple
-        ctx.fillStyle = '#ff0000';
-        ctx.beginPath();
-        ctx.arc(0, 0, quarterSize * 1.5, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Stem
-        ctx.fillStyle = '#553311';
-        ctx.fillRect(-2, -quarterSize * 1.5, 4, 6);
-
-        // Leaf
-        ctx.fillStyle = '#00aa00';
-        ctx.beginPath();
-        ctx.ellipse(4, -quarterSize * 1.5, 6, 3, Math.PI / 4, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillText('🍎', 0, 0);
         break;
-
       case 'ghost':
-        // Draw a glowing orb
-        const gradient = ctx.createRadialGradient(
-          0,
-          0,
-          0,
-          0,
-          0,
-          quarterSize * 2
-        );
-        gradient.addColorStop(0, '#ffffff');
-        gradient.addColorStop(0.5, '#88ccff');
-        gradient.addColorStop(1, '#4488ff');
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(0, 0, quarterSize * 1.5, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillText('🔮', 0, 0);
         break;
-
       case 'invincible':
-        // Draw a star
-        ctx.fillStyle = '#ffd700';
-        ctx.beginPath();
-        for (let i = 0; i < 5; i++) {
-          const angle = (i * 4 * Math.PI) / 5 - Math.PI / 2;
-          const radius = i === 0 ? quarterSize * 2 : quarterSize;
-          ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
-        }
-        ctx.closePath();
-        ctx.fill();
+        ctx.fillText('⭐', 0, 0);
         break;
-
       case 'double':
-        // Draw a gem
-        ctx.fillStyle = '#ff00ff';
-        ctx.beginPath();
-        ctx.moveTo(-quarterSize, 0);
-        ctx.lineTo(0, -quarterSize * 1.5);
-        ctx.lineTo(quarterSize, 0);
-        ctx.lineTo(0, quarterSize * 1.5);
-        ctx.closePath();
-        ctx.fill();
-
-        // Add shine
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(-quarterSize / 2, -quarterSize / 2);
-        ctx.lineTo(0, -quarterSize);
-        ctx.stroke();
+        ctx.fillText('💎', 0, 0);
         break;
     }
 
@@ -388,23 +393,32 @@ class Game {
   }
 
   handleFoodCollection() {
+    let points = 0;
+
     switch (this.food.type) {
       case 'normal':
-        this.score += 10;
+        points = 10;
         break;
       case 'ghost':
-        this.score += 15;
+        points = 15;
         this.activatePowerUp('ghost', 10000); // 10 seconds of ghost mode
         break;
       case 'invincible':
-        this.score += 15;
+        points = 15;
         this.activatePowerUp('invincible', 5000); // 5 seconds of invincibility
         break;
       case 'double':
-        this.score += 20;
+        points = 20;
         this.activatePowerUp('double', 8000); // 8 seconds of double points
         break;
     }
+
+    // Double the points if double points power-up is active
+    if (this.powerUps.double.active) {
+      points *= 2;
+    }
+
+    this.score += points;
     this.scoreElement.textContent = this.score;
   }
 
