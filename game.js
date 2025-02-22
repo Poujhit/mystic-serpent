@@ -6,6 +6,7 @@ class Snake {
     this.reset();
     this.growthAnimation = null;
     this.lastTailPosition = null;
+    this.autoPilot = false;
   }
 
   reset() {
@@ -15,9 +16,92 @@ class Snake {
     this.grown = false;
     this.ghostMode = false;
     this.invincible = false;
+    this.autoPilot = false;
+  }
+
+  calculatePathToFood(foodPos) {
+    const head = this.body[0];
+    const dx = foodPos.x - head.x;
+    const dy = foodPos.y - head.y;
+
+    // Try all possible moves and pick the best valid one
+    const possibleMoves = [
+      { x: Math.sign(dx), y: 0 }, // Horizontal
+      { x: 0, y: Math.sign(dy) }, // Vertical
+      { x: 0, y: Math.sign(dy) }, // Alternative 1
+      { x: Math.sign(dx), y: 0 }, // Alternative 2
+    ];
+
+    // Find a valid move that doesn't cause collision
+    for (const move of possibleMoves) {
+      const nextPos = {
+        x: head.x + move.x,
+        y: head.y + move.y,
+      };
+
+      // Check wall collision
+      if (
+        nextPos.x < 0 ||
+        nextPos.x >= this.gridWidth ||
+        nextPos.y < 0 ||
+        nextPos.y >= this.gridHeight
+      ) {
+        continue;
+      }
+
+      // Check self collision
+      if (
+        this.body.some(
+          (segment) => segment.x === nextPos.x && segment.y === nextPos.y
+        )
+      ) {
+        continue;
+      }
+
+      // Valid move found
+      return move;
+    }
+
+    // If no valid move found, try to find any safe move
+    const safeDirections = [
+      { x: 1, y: 0 },
+      { x: -1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 0, y: -1 },
+    ];
+
+    for (const move of safeDirections) {
+      const nextPos = {
+        x: head.x + move.x,
+        y: head.y + move.y,
+      };
+
+      if (
+        nextPos.x >= 0 &&
+        nextPos.x < this.gridWidth &&
+        nextPos.y >= 0 &&
+        nextPos.y < this.gridHeight &&
+        !this.body.some(
+          (segment) => segment.x === nextPos.x && segment.y === nextPos.y
+        )
+      ) {
+        return move;
+      }
+    }
+
+    // If no safe move found, return current direction
+    return this.direction;
   }
 
   update() {
+    // If in auto-pilot, calculate path to food
+    if (this.autoPilot && window.game) {
+      const foodPos = window.game.food.position;
+      // Only change direction if not going to collide
+      const newDir = this.calculatePathToFood(foodPos);
+      this.nextDirection = newDir;
+    }
+
     this.direction = { ...this.nextDirection };
     const head = { ...this.body[0] };
     head.x += this.direction.x;
@@ -257,40 +341,49 @@ class Snake {
 class Food {
   constructor() {
     this.gridSize = 20;
-    this.gridWidth = 30; // Match Snake's grid dimensions
+    this.gridWidth = 30;
     this.gridHeight = 20;
     this.position = { x: 0, y: 0 };
     this.type = 'normal';
+    this.powerUpChance = 0.3; // Increase chance to 30%
     this.randomize();
   }
 
   randomize() {
     this.position.x = Math.floor(Math.random() * this.gridWidth);
     this.position.y = Math.floor(Math.random() * this.gridHeight);
-    // 20% chance to spawn a power food
-    if (Math.random() < 0.2) {
+    // 30% chance to spawn a power food
+    if (Math.random() < this.powerUpChance) {
       this.type = this.getRandomPowerType();
     } else {
       this.type = 'normal';
     }
+    console.log('Spawned food type:', this.type); // Debug log
   }
 
   getRandomPowerType() {
-    const powerTypes = ['ghost', 'invincible', 'double'];
-    return powerTypes[Math.floor(Math.random() * powerTypes.length)];
+    const powerTypes = ['ghost', 'invincible', 'double', 'ultimate'];
+    // Ensure each power-up has equal chance
+    const randomIndex = Math.floor(Math.random() * powerTypes.length);
+    return powerTypes[randomIndex];
   }
 
   draw(ctx) {
     const x = this.position.x * this.gridSize;
     const y = this.position.y * this.gridSize;
-    const size = this.gridSize - 1;
-    const halfSize = size / 2;
+    const halfSize = this.gridSize / 2;
 
     ctx.save();
     ctx.translate(x + halfSize, y + halfSize);
-    ctx.font = `${this.gridSize}px Arial`;
+    ctx.font = `${this.gridSize - 2}px Arial`; // Slightly smaller font
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+
+    // Add slight glow effect for power-ups
+    if (this.type !== 'normal') {
+      ctx.shadowColor = '#fff';
+      ctx.shadowBlur = 10;
+    }
 
     switch (this.type) {
       case 'normal':
@@ -304,6 +397,9 @@ class Food {
         break;
       case 'double':
         ctx.fillText('💎', 0, 0);
+        break;
+      case 'ultimate':
+        ctx.fillText('👑', 0, 0);
         break;
     }
 
@@ -329,6 +425,7 @@ class Game {
       ghost: { active: false, timeLeft: 0 },
       invincible: { active: false, timeLeft: 0 },
       double: { active: false, timeLeft: 0 },
+      ultimate: { active: false, timeLeft: 0 },
     };
     this.lastTime = Date.now();
     this.paused = false;
@@ -457,6 +554,14 @@ class Game {
         points = 20;
         this.activatePowerUp('double', 8000);
         break;
+      case 'ultimate':
+        points = 25;
+        // Only activate autopilot if not already in autopilot mode
+        if (!this.snake.autoPilot) {
+          this.snake.autoPilot = true;
+          this.activatePowerUp('ultimate', 20000);
+        }
+        break;
     }
 
     if (this.powerUps.double.active) {
@@ -479,6 +584,7 @@ class Game {
       ghost: ['#6666ff'],
       invincible: ['#ffcc00'],
       double: ['#00ff88'],
+      ultimate: ['#ff00ff'],
     };
 
     for (let i = 0; i < particleCount; i++) {
@@ -561,6 +667,9 @@ class Game {
             this.snake.ghostMode = false;
           } else if (type === 'invincible') {
             this.snake.invincible = false;
+          } else if (type === 'ultimate') {
+            this.snake.autoPilot = false;
+            this.snake.ghostMode = false;
           }
         }
       }
@@ -642,4 +751,4 @@ class Game {
 }
 
 // Start the game when the page loads
-window.onload = () => new Game();
+window.onload = () => (window.game = new Game());
