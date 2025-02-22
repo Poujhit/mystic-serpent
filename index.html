@@ -3,107 +3,120 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Snake Game</title>
+    <title>Mystic Serpent</title>
     <link rel="stylesheet" href="styles.css" />
     <link
-      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap"
       rel="stylesheet"
     />
   </head>
   <body>
-    <div class="game-container">
-      <div class="header">
-        <h1>Mystic Serpent</h1>
+    <div class="arcade-cabinet">
+      <!-- Title Section -->
+      <div class="arcade-header">
+        <h1>MYSTIC SERPENT</h1>
+        <div class="arcade-screen-decor"></div>
         <div class="ai-credit">
-          <span class="ai-badge">🤖 AI-Coded Game</span>
+          <span class="ai-badge">🤖 AI-CODED GAME</span>
           <span class="ai-text"
             >Features by Human • Implementation by Claude</span
           >
         </div>
-        <div class="stats">
-          <div class="score-box">Score: <span id="score">0</span></div>
-          <div class="high-score-box">
-            High Score: <span id="highScore">0</span>
-          </div>
-        </div>
       </div>
 
-      <div class="game-area">
-        <div class="power-ups-panel">
-          <h3>Active Powers</h3>
-          <div id="activePowerUps"></div>
+      <!-- Main Game Section -->
+      <div class="arcade-screen">
+        <!-- Left Panel -->
+        <div class="side-panel left-panel">
+          <div class="panel-content power-ups-panel">
+            <div class="neon-header">ACTIVE POWERS</div>
+            <div id="activePowerUps"></div>
+          </div>
         </div>
 
-        <div class="canvas-container">
-          <canvas id="gameCanvas" width="600" height="400"></canvas>
+        <!-- Game Screen -->
+        <div class="game-screen">
+          <div class="screen-bezel">
+            <div class="stats-display">
+              <div class="score-box">SCORE: <span id="score">0</span></div>
+              <div class="high-score-box">
+                HI-SCORE: <span id="highScore">0</span>
+              </div>
+            </div>
+            <canvas id="gameCanvas" width="600" height="400"></canvas>
+          </div>
           <div id="gameOver" class="game-over hidden">
-            <h2>Game Over!</h2>
-            <p>Final Score: <span id="finalScore">0</span></p>
-            <button id="restartButton">Play Again</button>
+            <h2>GAME OVER!</h2>
+            <p>FINAL SCORE: <span id="finalScore">0</span></p>
+            <button id="restartButton">INSERT COIN</button>
           </div>
           <div id="pauseOverlay" class="pause-overlay hidden">
-            <h2>Paused</h2>
-            <p>Press P to resume</p>
+            <h2>PAUSED</h2>
+            <p>PRESS P TO RESUME</p>
           </div>
         </div>
 
-        <div class="food-legend">
-          <h3>Power-Ups Guide</h3>
-          <div class="guide-link">
+        <!-- Right Panel -->
+        <div class="side-panel right-panel">
+          <div class="panel-content food-legend">
+            <div class="neon-header">POWER-UPS</div>
             <a href="power-ups.html" id="powerUpsGuideLink" class="guide-button"
-              >Detailed Guide</a
+              >MANUAL</a
             >
+            <ul>
+              <li data-tooltip="Regular food - Adds 10 points to score">
+                <span class="food-dot normal">🍎</span>
+                10 PTS
+              </li>
+              <li data-tooltip="Ghost Mode - Pass through yourself">
+                <span class="food-dot ghost">🔮</span>
+                GHOST
+              </li>
+              <li data-tooltip="Star Power - Pass through walls and yourself">
+                <span class="food-dot invincible">⭐</span>
+                STAR
+              </li>
+              <li data-tooltip="Crystal Gem - Double points for all food">
+                <span class="food-dot double">💎</span>
+                2X PTS
+              </li>
+              <li data-tooltip="Shrink Ray - Reduce snake length by 5">
+                <span class="food-dot shrink">✂️</span>
+                SHRINK
+              </li>
+              <li data-tooltip="Cursed Fruit - Limited vision mode">
+                <span class="food-dot cursed">💀</span>
+                CURSED
+              </li>
+              <li data-tooltip="Auto-Pilot Crown - Snake moves automatically">
+                <span class="food-dot ultimate">👑</span>
+                AUTO
+              </li>
+            </ul>
           </div>
-          <ul>
-            <li>
-              <span class="food-dot normal">🍎</span>
-              <span>Apple: 10 points</span>
-            </li>
-            <li>
-              <span class="food-dot ghost">🔮</span>
-              <span>Ghost Orb: 15 points + Pass through yourself (10s)</span>
-            </li>
-            <li>
-              <span class="food-dot invincible">⭐</span>
-              <span
-                >Star Power: 15 points + Pass through walls and self (10s)</span
-              >
-            </li>
-            <li>
-              <span class="food-dot double">💎</span>
-              <span>Crystal Gem: 20 points + Double points (8s)</span>
-            </li>
-            <li>
-              <span class="food-dot shrink">✂️</span>
-              <span>Shrink Ray: 25 points + Reduce snake length by 5</span>
-            </li>
-            <li>
-              <span class="food-dot cursed">💀</span>
-              <span>Cursed Fruit: 200 points + Dark Mode (5s)</span>
-            </li>
-            <li>
-              <span class="food-dot ultimate">👑</span>
-              <span>Ultimate: 25 points + Auto-pilot mode (20s)</span>
-            </li>
-          </ul>
         </div>
       </div>
 
-      <div class="controls">
-        <h3>Controls</h3>
-        <div class="controls-grid">
-          <div class="control-key">↑</div>
-          <div class="control-desc">Up</div>
-          <div class="control-key">←</div>
-          <div class="control-desc">Left</div>
-          <div class="control-key">↓</div>
-          <div class="control-desc">Down</div>
-          <div class="control-key">→</div>
-          <div class="control-desc">Right</div>
-          <div class="control-key">P</div>
-          <div class="control-desc">Pause</div>
-          <div class="control-key">Space</div>
-          <div class="control-desc">Restart</div>
+      <!-- Control Panel -->
+      <div class="arcade-controls">
+        <div class="control-panel">
+          <div class="neon-header">CONTROLS</div>
+          <div class="controls-layout">
+            <div class="direction-controls">
+              <div class="control-key">↑</div>
+              <div class="control-row">
+                <div class="control-key">←</div>
+                <div class="control-key">↓</div>
+                <div class="control-key">→</div>
+              </div>
+            </div>
+            <div class="action-controls">
+              <div class="control-key">P</div>
+              <div class="control-desc">PAUSE</div>
+              <div class="control-key">SPACE</div>
+              <div class="control-desc">START</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

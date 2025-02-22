@@ -177,6 +177,19 @@ class Snake {
   }
 
   draw(ctx, color = '#00ff00') {
+    // Draw walls first
+    ctx.strokeStyle = '#4ecca3'; // Matching arcade theme
+    ctx.lineWidth = 2;
+    ctx.shadowColor = '#4ecca3';
+    ctx.shadowBlur = 10;
+    ctx.strokeRect(
+      0,
+      0,
+      this.gridWidth * this.gridSize,
+      this.gridHeight * this.gridSize
+    );
+    ctx.shadowBlur = 0;
+
     const radius = this.gridSize / 3;
 
     // Draw growth animation if active
