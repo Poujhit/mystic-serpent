@@ -21,94 +21,196 @@ class Snake {
 
   calculatePathToFood(foodPos) {
     const head = this.body[0];
-    const dx = foodPos.x - head.x;
-    const dy = foodPos.y - head.y;
 
     // Helper function to check if a position is safe
     const isSafePosition = (pos) => {
-      return (
-        pos.x >= 0 &&
-        pos.x < this.gridWidth &&
-        pos.y >= 0 &&
-        pos.y < this.gridHeight &&
-        !this.body.some((segment) => segment.x === pos.x && segment.y === pos.y)
-      );
+      // Check if position is within grid boundaries or can wrap around if invincible
+      const validPosition = this.invincible
+        ? true // When invincible, any position is valid due to wrap-around
+        : pos.x >= 0 &&
+          pos.x < this.gridWidth &&
+          pos.y >= 0 &&
+          pos.y < this.gridHeight;
+
+      // Check if position collides with snake body (unless in ghost mode)
+      const noBodyCollision =
+        this.ghostMode ||
+        !this.body.some(
+          (segment, index) =>
+            // For ghost mode, only check first few segments to avoid immediate self-collision
+            (index < 3 || !this.ghostMode) &&
+            segment.x === pos.x &&
+            segment.y === pos.y
+        );
+
+      return validPosition && noBodyCollision;
     };
 
-    // Helper function to calculate distance to food
-    const getDistanceToFood = (pos) => {
-      return Math.abs(foodPos.x - pos.x) + Math.abs(foodPos.y - pos.y);
+    // A* pathfinding implementation
+    const findPath = () => {
+      // Define possible moves
+      const possibleMoves = [
+        { x: 1, y: 0 }, // Right
+        { x: 0, y: 1 }, // Down
+        { x: -1, y: 0 }, // Left
+        { x: 0, y: -1 }, // Up
+      ];
+
+      // Normalize position for wrap-around grid
+      const normalizePos = (pos) => {
+        // Only normalize if invincible, otherwise keep original position
+        if (this.invincible) {
+          return {
+            x: (pos.x + this.gridWidth) % this.gridWidth,
+            y: (pos.y + this.gridHeight) % this.gridHeight,
+          };
+        }
+        return { ...pos }; // Return copy of original position if not invincible
+      };
+
+      // Calculate Manhattan distance considering wrap-around
+      const getDistance = (pos1, pos2) => {
+        // If invincible, consider wrap-around distances
+        if (this.invincible) {
+          const dx = Math.min(
+            Math.abs(pos1.x - pos2.x),
+            this.gridWidth - Math.abs(pos1.x - pos2.x)
+          );
+          const dy = Math.min(
+            Math.abs(pos1.y - pos2.y),
+            this.gridHeight - Math.abs(pos1.y - pos2.y)
+          );
+          return dx + dy;
+        } else {
+          // Standard Manhattan distance when not invincible
+          return Math.abs(pos1.x - pos2.x) + Math.abs(pos1.y - pos2.y);
+        }
+      };
+
+      // Check if we can directly move to food (for simple cases)
+      for (const move of possibleMoves) {
+        const nextPos = {
+          x: head.x + move.x,
+          y: head.y + move.y,
+        };
+
+        // Only normalize if invincible
+        const normalizedPos = normalizePos(nextPos);
+
+        if (
+          normalizedPos.x === foodPos.x &&
+          normalizedPos.y === foodPos.y &&
+          isSafePosition(normalizedPos)
+        ) {
+          return move; // Direct path to food
+        }
+      }
+
+      // Find best move using a combination of safety and distance heuristics
+      let bestMove = null;
+      let bestScore = -Infinity;
+
+      for (const move of possibleMoves) {
+        const nextPos = {
+          x: head.x + move.x,
+          y: head.y + move.y,
+        };
+
+        // Check if position is safe before normalizing
+        if (!isSafePosition(nextPos)) {
+          continue; // Skip unsafe moves
+        }
+
+        // Calculate score based on multiple factors
+        let score = 0;
+
+        // Distance to food (higher score for moves that get closer)
+        const currentDistance = getDistance(head, foodPos);
+        const newDistance = getDistance(nextPos, foodPos);
+
+        if (newDistance < currentDistance) {
+          score += 10; // Significant bonus for getting closer
+        }
+
+        // Check if this move leads to a dead end
+        const futureOptions = possibleMoves.filter((futureMove) => {
+          const futurePos = {
+            x: nextPos.x + futureMove.x,
+            y: nextPos.y + futureMove.y,
+          };
+          return isSafePosition(futurePos);
+        });
+
+        // Add score based on future move options (avoid dead ends)
+        score += futureOptions.length * 5;
+
+        // Avoid moving in opposite direction of current direction
+        // (prevents unnecessary back-and-forth movement)
+        if (!(move.x === -this.direction.x && move.y === -this.direction.y)) {
+          score += 2;
+        }
+
+        // Prefer continuing in same direction when possible
+        if (move.x === this.direction.x && move.y === this.direction.y) {
+          score += 3;
+        }
+
+        // Extra caution near walls when not invincible
+        if (!this.invincible) {
+          const distanceToWall = Math.min(
+            nextPos.x,
+            this.gridWidth - 1 - nextPos.x,
+            nextPos.y,
+            this.gridHeight - 1 - nextPos.y
+          );
+
+          // Add score for positions further from walls
+          score += distanceToWall;
+        }
+
+        // Update best move if this score is higher
+        if (score > bestScore) {
+          bestScore = score;
+          bestMove = move;
+        }
+      }
+
+      return bestMove;
     };
 
-    // Try all possible moves and pick the best valid one
-    const possibleMoves = [
-      { x: 1, y: 0 }, // Right
-      { x: -1, y: 0 }, // Left
-      { x: 0, y: 1 }, // Down
-      { x: 0, y: -1 }, // Up
-    ];
+    // Try to find a path
+    const bestMove = findPath();
 
-    // Score each possible move
-    let bestMove = null;
-    let bestScore = -Infinity;
+    // If no good move found, try to find any safe move
+    if (!bestMove) {
+      const possibleMoves = [
+        { x: 1, y: 0 }, // Right
+        { x: 0, y: 1 }, // Down
+        { x: -1, y: 0 }, // Left
+        { x: 0, y: -1 }, // Up
+      ];
 
-    // Find a valid move that doesn't cause collision
-    for (const move of possibleMoves) {
-      const nextPos = {
-        x: head.x + move.x,
-        y: head.y + move.y,
-      };
+      // Filter to only safe moves
+      const safeMoves = possibleMoves.filter((move) => {
+        const nextPos = {
+          x: head.x + move.x,
+          y: head.y + move.y,
+        };
 
-      if (!isSafePosition(nextPos)) {
-        continue;
-      }
-
-      // Calculate score for this move
-      let score = 0;
-
-      // Higher score for moves that get us closer to food
-      const currentDistance = getDistanceToFood(head);
-      const newDistance = getDistanceToFood(nextPos);
-      if (newDistance < currentDistance) {
-        score += 2;
-      }
-
-      // Prioritize horizontal movement when food is more horizontal
-      if (Math.abs(dx) > Math.abs(dy)) {
-        if ((dx > 0 && move.x > 0) || (dx < 0 && move.x < 0)) {
-          score += 1;
+        // Only normalize if invincible
+        if (this.invincible) {
+          nextPos.x = (nextPos.x + this.gridWidth) % this.gridWidth;
+          nextPos.y = (nextPos.y + this.gridHeight) % this.gridHeight;
         }
-      } else {
-        // Prioritize vertical movement when food is more vertical
-        if ((dy > 0 && move.y > 0) || (dy < 0 && move.y < 0)) {
-          score += 1;
-        }
-      }
 
-      // Update best move if this score is higher
-      if (score > bestScore) {
-        bestScore = score;
-        bestMove = move;
-      }
+        return isSafePosition(nextPos);
+      });
+
+      // Return any safe move or current direction if none found
+      return safeMoves.length > 0 ? safeMoves[0] : this.direction;
     }
 
-    // Return best move if found
-    if (bestMove) return bestMove;
-
-    // If no valid move found, try to find any safe move
-    for (const move of possibleMoves) {
-      const nextPos = {
-        x: head.x + move.x,
-        y: head.y + move.y,
-      };
-
-      if (isSafePosition(nextPos)) {
-        return move;
-      }
-    }
-
-    // If no safe move found, return current direction
-    return this.direction;
+    return bestMove;
   }
 
   update() {
@@ -485,11 +587,19 @@ class Game {
 
     // Update the keydown event listener to prevent scrolling
     document.addEventListener('keydown', (e) => {
-      // Prevent arrow keys from scrolling
+      // Prevent arrow keys and WASD from scrolling
       if (
-        ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(
-          e.code
-        )
+        [
+          'ArrowUp',
+          'ArrowDown',
+          'ArrowLeft',
+          'ArrowRight',
+          'Space',
+          'KeyW',
+          'KeyA',
+          'KeyS',
+          'KeyD',
+        ].includes(e.code)
       ) {
         e.preventDefault();
       }
@@ -502,9 +612,17 @@ class Game {
     // Update the main key handler to prevent scrolling
     document.addEventListener('keydown', (e) => {
       if (
-        ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(
-          e.code
-        )
+        [
+          'ArrowUp',
+          'ArrowDown',
+          'ArrowLeft',
+          'ArrowRight',
+          'Space',
+          'KeyW',
+          'KeyA',
+          'KeyS',
+          'KeyD',
+        ].includes(e.code)
       ) {
         e.preventDefault();
         this.handleKeyPress(e);
@@ -545,6 +663,19 @@ class Game {
         this.snake.direction.x !== 1 &&
         (this.snake.nextDirection = { x: -1, y: 0 }),
       ArrowRight: () =>
+        this.snake.direction.x !== -1 &&
+        (this.snake.nextDirection = { x: 1, y: 0 }),
+      // Add WASD support
+      KeyW: () =>
+        this.snake.direction.y !== 1 &&
+        (this.snake.nextDirection = { x: 0, y: -1 }),
+      KeyS: () =>
+        this.snake.direction.y !== -1 &&
+        (this.snake.nextDirection = { x: 0, y: 1 }),
+      KeyA: () =>
+        this.snake.direction.x !== 1 &&
+        (this.snake.nextDirection = { x: -1, y: 0 }),
+      KeyD: () =>
         this.snake.direction.x !== -1 &&
         (this.snake.nextDirection = { x: 1, y: 0 }),
     };
