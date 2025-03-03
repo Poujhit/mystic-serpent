@@ -386,3 +386,21 @@ body {
     opacity: 0.7;
   }
 }
+
+.power-up-indicator.ending {
+  background: rgba(255, 0, 0, 0.2);
+  border: 1px solid #ff6666;
+  animation: endingPulse 0.5s infinite;
+}
+
+@keyframes endingPulse {
+  0% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.5;
+  }
+}

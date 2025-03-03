@@ -24,20 +24,17 @@ class Snake {
 
     // Helper function to check if a position is safe
     const isSafePosition = (pos) => {
-      // Check if position is within grid boundaries or can wrap around if invincible
-      const validPosition = this.invincible
-        ? true
-        : pos.x >= 0 &&
-          pos.x < this.gridWidth &&
-          pos.y >= 0 &&
-          pos.y < this.gridHeight;
+      // During auto-pilot, always check boundaries regardless of invincibility
+      const validPosition =
+        pos.x >= 0 &&
+        pos.x < this.gridWidth &&
+        pos.y >= 0 &&
+        pos.y < this.gridHeight;
 
-      // Check if position collides with snake body (unless in ghost mode)
-      const noBodyCollision =
-        this.ghostMode ||
-        !this.body.some(
-          (segment) => segment.x === pos.x && segment.y === pos.y
-        );
+      // During auto-pilot, always check body collisions regardless of ghost mode
+      const noBodyCollision = !this.body.some(
+        (segment) => segment.x === pos.x && segment.y === pos.y
+      );
 
       return validPosition && noBodyCollision;
     };
@@ -51,30 +48,11 @@ class Snake {
         { x: 0, y: -1 },
       ];
 
-      // Normalize position considering wrap-around
-      const normalizePos = (pos) => {
-        if (this.invincible) {
-          return {
-            x: (pos.x + this.gridWidth) % this.gridWidth,
-            y: (pos.y + this.gridHeight) % this.gridHeight,
-          };
-        }
-        return { ...pos };
-      };
+      // Normalize position without considering wrap-around during auto-pilot
+      const normalizePos = (pos) => ({ ...pos });
 
-      // Calculate Manhattan distance with wrap-around consideration
+      // Calculate Manhattan distance without wrap-around during auto-pilot
       const getDistance = (pos1, pos2) => {
-        if (this.invincible) {
-          const dx = Math.min(
-            Math.abs(pos1.x - pos2.x),
-            this.gridWidth - Math.abs(pos1.x - pos2.x)
-          );
-          const dy = Math.min(
-            Math.abs(pos1.y - pos2.y),
-            this.gridHeight - Math.abs(pos1.y - pos2.y)
-          );
-          return dx + dy;
-        }
         return Math.abs(pos1.x - pos2.x) + Math.abs(pos1.y - pos2.y);
       };
 
@@ -127,7 +105,7 @@ class Snake {
 
         // Available space after move
         const availableSpace = getAvailableSpace();
-        const requiredSpace = this.body.length * 1.5; // Need more space than snake length
+        const requiredSpace = this.body.length * 1.5;
         score += (availableSpace / requiredSpace) * 20;
 
         // Avoid trapping self
@@ -135,16 +113,14 @@ class Snake {
           score -= 100;
         }
 
-        // Prefer moves away from walls when not invincible
-        if (!this.invincible) {
-          const distanceToWall = Math.min(
-            pos.x,
-            this.gridWidth - 1 - pos.x,
-            pos.y,
-            this.gridHeight - 1 - pos.y
-          );
-          score += distanceToWall * 2;
-        }
+        // Always prefer moves away from walls during auto-pilot
+        const distanceToWall = Math.min(
+          pos.x,
+          this.gridWidth - 1 - pos.x,
+          pos.y,
+          this.gridHeight - 1 - pos.y
+        );
+        score += distanceToWall * 2;
 
         // Prefer continuing in same direction
         if (move.x === this.direction.x && move.y === this.direction.y) {
@@ -209,7 +185,6 @@ class Snake {
     // If in auto-pilot, calculate path to food
     if (this.autoPilot && window.game) {
       const foodPos = window.game.food.position;
-      // Only change direction if not going to collide
       const newDir = this.calculatePathToFood(foodPos);
       this.nextDirection = newDir;
     }
@@ -590,8 +565,11 @@ class Game {
     this.gameOver = false;
     this.gameOverElement = document.getElementById('gameOver');
     this.scoreElement = document.getElementById('score');
-    this.baseSpeed = 150; // Changed from 200 to 150 for medium initial speed
-    this.minSpeed = 60; // Changed from 70 to 60 for slightly faster max speed
+    this.baseSpeed = 150;
+    this.minSpeed = 60;
+    this.autoEndingSpeed = 300;
+    this.waitingForInput = false;
+    this.lastValidDirection = null;
     this.powerUps = {
       ghost: { active: false, timeLeft: 0 },
       invincible: { active: false, timeLeft: 0 },
@@ -672,41 +650,69 @@ class Game {
     }
 
     const keyActions = {
-      ArrowUp: () =>
-        this.snake.direction.y !== 1 &&
-        (this.snake.nextDirection = { x: 0, y: -1 }),
-      ArrowDown: () =>
-        this.snake.direction.y !== -1 &&
-        (this.snake.nextDirection = { x: 0, y: 1 }),
-      ArrowLeft: () =>
-        this.snake.direction.x !== 1 &&
-        (this.snake.nextDirection = { x: -1, y: 0 }),
-      ArrowRight: () =>
-        this.snake.direction.x !== -1 &&
-        (this.snake.nextDirection = { x: 1, y: 0 }),
-      // Add WASD support
-      KeyW: () =>
-        this.snake.direction.y !== 1 &&
-        (this.snake.nextDirection = { x: 0, y: -1 }),
-      KeyS: () =>
-        this.snake.direction.y !== -1 &&
-        (this.snake.nextDirection = { x: 0, y: 1 }),
-      KeyA: () =>
-        this.snake.direction.x !== 1 &&
-        (this.snake.nextDirection = { x: -1, y: 0 }),
-      KeyD: () =>
-        this.snake.direction.x !== -1 &&
-        (this.snake.nextDirection = { x: 1, y: 0 }),
+      ArrowUp: () => ({ x: 0, y: -1 }),
+      ArrowDown: () => ({ x: 0, y: 1 }),
+      ArrowLeft: () => ({ x: -1, y: 0 }),
+      ArrowRight: () => ({ x: 1, y: 0 }),
+      KeyW: () => ({ x: 0, y: -1 }),
+      KeyS: () => ({ x: 0, y: 1 }),
+      KeyA: () => ({ x: -1, y: 0 }),
+      KeyD: () => ({ x: 1, y: 0 }),
     };
 
+    // Handle input after auto-pilot ends
+    if (this.waitingForInput && keyActions[event.code]) {
+      const newDirection = keyActions[event.code]();
+
+      // Check if the new direction is valid (not opposite to last valid direction)
+      if (
+        !(
+          this.lastValidDirection &&
+          newDirection.x === -this.lastValidDirection.x &&
+          newDirection.y === -this.lastValidDirection.y
+        )
+      ) {
+        this.waitingForInput = false;
+        this.snake.nextDirection = newDirection;
+        this.snake.direction = { ...this.lastValidDirection }; // Keep current direction until next update
+        this.lastValidDirection = null;
+      }
+      return;
+    }
+
+    // Normal direction changes
     if (keyActions[event.code]) {
-      keyActions[event.code]();
+      const newDir = keyActions[event.code]();
+      if (
+        !(
+          this.snake.direction.x === -newDir.x &&
+          this.snake.direction.y === -newDir.y
+        )
+      ) {
+        this.snake.nextDirection = newDir;
+      }
     }
   }
 
   getSpeed() {
-    // Adjusted speed increase rate:
-    // Now every 70 points, speed increases by 4ms
+    // If in ending phase of auto-pilot, use slower speed
+    if (
+      this.powerUps.ultimate.active &&
+      this.powerUps.ultimate.timeLeft < 3000
+    ) {
+      return this.autoEndingSpeed;
+    }
+
+    // If waiting for input and snake is stopped, use normal speed but don't move
+    if (
+      this.waitingForInput &&
+      this.lastValidDirection.x === 0 &&
+      this.lastValidDirection.y === 0
+    ) {
+      return this.baseSpeed; // Keep normal update speed but snake won't move
+    }
+
+    // Normal speed calculation
     const speedDecrease = Math.floor(this.score / 70) * 4;
     return Math.max(this.minSpeed, this.baseSpeed - speedDecrease);
   }
@@ -724,28 +730,56 @@ class Game {
     this.snake.ghostMode = this.powerUps.ghost.active;
     this.snake.invincible = this.powerUps.invincible.active;
 
-    // Check collision result
-    const updateResult = this.snake.update();
+    if (!this.waitingForInput) {
+      // Normal snake update
+      const updateResult = this.snake.update();
+      if (
+        (!this.snake.invincible && !updateResult) ||
+        (this.powerUps.cursed.active && !updateResult)
+      ) {
+        this.handleGameOver();
+        return;
+      }
+    } else {
+      // When waiting for input, keep moving in last valid direction
+      const head = { ...this.snake.body[0] };
+      head.x += this.lastValidDirection.x;
+      head.y += this.lastValidDirection.y;
 
-    // End game if collision occurs during cursed mode or when not invincible
-    if (
-      (!this.snake.invincible && !updateResult) ||
-      (this.powerUps.cursed.active && !updateResult)
-    ) {
-      // End cursed mode immediately
-      if (this.powerUps.cursed.active) {
-        this.powerUps.cursed.active = false;
-        this.powerUps.cursed.timeLeft = 0;
-        document.body.classList.remove('cursed-mode');
-        this.canvas.classList.remove('cursed');
+      // Handle wall collisions while waiting for input
+      if (
+        head.x < 0 ||
+        head.x >= this.snake.gridWidth ||
+        head.y < 0 ||
+        head.y >= this.snake.gridHeight
+      ) {
+        if (this.snake.invincible) {
+          head.x = (head.x + this.snake.gridWidth) % this.snake.gridWidth;
+          head.y = (head.y + this.snake.gridHeight) % this.snake.gridHeight;
+        } else {
+          // If not invincible, stop at the wall
+          head.x = Math.max(0, Math.min(head.x, this.snake.gridWidth - 1));
+          head.y = Math.max(0, Math.min(head.y, this.snake.gridHeight - 1));
+          // Stop moving in this direction
+          this.lastValidDirection = { x: 0, y: 0 };
+        }
       }
 
-      this.gameOver = true;
-      this.gameOverElement.classList.remove('hidden');
-      this.handleGameOver();
-      return;
+      // Check for self collision
+      const willCollide = this.snake.body.some(
+        (segment) => segment.x === head.x && segment.y === head.y
+      );
+
+      if (!willCollide || this.snake.ghostMode) {
+        this.snake.body.unshift(head);
+        this.snake.body.pop();
+      } else {
+        // Stop moving if would collide with self
+        this.lastValidDirection = { x: 0, y: 0 };
+      }
     }
 
+    // Check for food collection
     const head = this.snake.body[0];
     if (head.x === this.food.position.x && head.y === this.food.position.y) {
       this.snake.grow();
@@ -899,6 +933,13 @@ class Game {
     for (const [type, power] of Object.entries(this.powerUps)) {
       if (power.active) {
         power.timeLeft -= deltaTime;
+
+        // Special handling for ultimate (auto-pilot) power-up ending
+        if (type === 'ultimate' && power.timeLeft <= 3000) {
+          // Find safe position in last 3 seconds
+          this.findSafePosition();
+        }
+
         if (power.timeLeft <= 0) {
           power.active = false;
           if (type === 'ghost') {
@@ -906,8 +947,14 @@ class Game {
           } else if (type === 'invincible') {
             this.snake.invincible = false;
           } else if (type === 'ultimate') {
+            // Store the last valid direction before stopping
+            this.lastValidDirection = { ...this.snake.direction };
             this.snake.autoPilot = false;
-            this.snake.ghostMode = false;
+            this.waitingForInput = true;
+            this.showAutoEndMessage();
+            // Keep the snake moving in the last valid direction
+            this.snake.direction = { ...this.lastValidDirection };
+            this.snake.nextDirection = { ...this.lastValidDirection };
           }
         }
       }
@@ -1128,6 +1175,64 @@ class Game {
     };
 
     requestAnimationFrame(animate);
+  }
+
+  // New method to find a safe position for the snake
+  findSafePosition() {
+    if (!this.snake.autoPilot) return;
+
+    const head = this.snake.body[0];
+    const possibleMoves = [
+      { x: 1, y: 0 },
+      { x: 0, y: 1 },
+      { x: -1, y: 0 },
+      { x: 0, y: -1 },
+    ];
+
+    // Try to move snake to center of the grid if possible
+    const centerX = Math.floor(this.snake.gridWidth / 2);
+    const centerY = Math.floor(this.snake.gridHeight / 2);
+
+    // Calculate distances from edges
+    const distanceFromEdges = Math.min(
+      head.x,
+      this.snake.gridWidth - head.x,
+      head.y,
+      this.snake.gridHeight - head.y
+    );
+
+    // If close to edge, try to move towards center
+    if (distanceFromEdges < 3) {
+      const dx = centerX - head.x;
+      const dy = centerY - head.y;
+
+      // Prioritize the larger distance to get away from the closer edge
+      if (Math.abs(dx) > Math.abs(dy)) {
+        this.snake.nextDirection = { x: Math.sign(dx), y: 0 };
+      } else {
+        this.snake.nextDirection = { x: 0, y: Math.sign(dy) };
+      }
+    }
+  }
+
+  // New method to show message when auto-pilot is ending
+  showAutoEndMessage() {
+    const container = document.getElementById('activePowerUps');
+    const message = document.createElement('div');
+    message.className = 'power-up-indicator ultimate ending';
+    message.innerHTML = `
+      <div>🎮 AUTO-PILOT ENDED 🎮</div>
+      <div style="font-size: 0.8em; margin-top: 5px;">Press a direction key to resume</div>
+    `;
+    container.appendChild(message);
+
+    // Keep message visible until user input
+    const checkAndRemove = setInterval(() => {
+      if (!this.waitingForInput && message.parentNode === container) {
+        container.removeChild(message);
+        clearInterval(checkAndRemove);
+      }
+    }, 100);
   }
 }
 
