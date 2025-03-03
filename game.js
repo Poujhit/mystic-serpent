@@ -467,12 +467,15 @@ class Food {
     this.powerUpChance = 0.3;
     this.lastShrinkTime = 0;
     this.shrinkCooldown = 60000; // 1 minute cooldown
+    this.spawnTime = Date.now(); // Track when food was spawned
+    this.respawnDelay = 10000; // 10 seconds before respawning
     this.randomize();
   }
 
   randomize() {
     this.position.x = Math.floor(Math.random() * this.gridWidth);
     this.position.y = Math.floor(Math.random() * this.gridHeight);
+    this.spawnTime = Date.now(); // Reset spawn time when new food is created
 
     // Get current snake length from game instance
     const snakeLength = window.game?.snake?.body?.length || 1;
@@ -514,6 +517,20 @@ class Food {
     }
   }
 
+  // Check if food needs to be respawned
+  checkRespawn() {
+    const currentTime = Date.now();
+    if (currentTime - this.spawnTime > this.respawnDelay) {
+      // Create a fade-out effect for the old food
+      if (window.game) {
+        window.game.createFoodTimeoutEffect(this.position);
+      }
+      this.randomize();
+      return true;
+    }
+    return false;
+  }
+
   draw(ctx) {
     const x = this.position.x * this.gridSize;
     const y = this.position.y * this.gridSize;
@@ -529,6 +546,16 @@ class Food {
     if (this.type !== 'normal') {
       ctx.shadowColor = '#fff';
       ctx.shadowBlur = 10;
+    }
+
+    // Calculate time remaining and add visual indicator
+    const timeRemaining =
+      (this.respawnDelay - (Date.now() - this.spawnTime)) / 1000;
+    if (timeRemaining < 3) {
+      // Make food blink when about to disappear
+      if (Math.floor(Date.now() / 250) % 2 === 0) {
+        ctx.globalAlpha = 0.5;
+      }
     }
 
     switch (this.type) {
@@ -697,6 +724,9 @@ class Game {
 
     // Update power-up timers
     this.updatePowerUps();
+
+    // Check if food needs to be respawned
+    this.food.checkRespawn();
 
     // Update snake's ghost mode and invincibility status
     this.snake.ghostMode = this.powerUps.ghost.active;
@@ -1051,6 +1081,61 @@ class Game {
       () => requestAnimationFrame(this.gameLoop.bind(this)),
       this.getSpeed()
     );
+  }
+
+  // Add this method to the Game class
+  createFoodTimeoutEffect(position) {
+    const x = position.x * this.snake.gridSize + this.snake.gridSize / 2;
+    const y = position.y * this.snake.gridSize + this.snake.gridSize / 2;
+
+    // Create particles for timeout effect
+    const particles = [];
+    const particleCount = 6;
+
+    for (let i = 0; i < particleCount; i++) {
+      const angle = (i / particleCount) * Math.PI * 2;
+      particles.push({
+        x: x,
+        y: y,
+        vx: Math.cos(angle) * 2,
+        vy: Math.sin(angle) * 2,
+        size: 3,
+        life: 1,
+        color: '#ff6666', // Red color for timeout
+      });
+    }
+
+    let lastTime = performance.now();
+    const animate = (currentTime) => {
+      const allParticlesDead = particles.every((p) => p.life <= 0);
+      if (allParticlesDead) return;
+
+      const deltaTime = (currentTime - lastTime) / 16;
+      lastTime = currentTime;
+
+      this.ctx.save();
+      particles.forEach((p) => {
+        if (p.life > 0) {
+          p.x += p.vx * deltaTime;
+          p.y += p.vy * deltaTime;
+          p.life -= 0.05 * deltaTime;
+
+          this.ctx.shadowColor = p.color;
+          this.ctx.shadowBlur = 4;
+          this.ctx.fillStyle = p.color;
+          this.ctx.globalAlpha = p.life;
+
+          this.ctx.beginPath();
+          this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          this.ctx.fill();
+        }
+      });
+      this.ctx.restore();
+
+      requestAnimationFrame(animate);
+    };
+
+    requestAnimationFrame(animate);
   }
 }
 
