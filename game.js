@@ -26,7 +26,7 @@ class Snake {
     const isSafePosition = (pos) => {
       // Check if position is within grid boundaries or can wrap around if invincible
       const validPosition = this.invincible
-        ? true // When invincible, any position is valid due to wrap-around
+        ? true
         : pos.x >= 0 &&
           pos.x < this.gridWidth &&
           pos.y >= 0 &&
@@ -36,11 +36,7 @@ class Snake {
       const noBodyCollision =
         this.ghostMode ||
         !this.body.some(
-          (segment, index) =>
-            // For ghost mode, only check first few segments to avoid immediate self-collision
-            (index < 3 || !this.ghostMode) &&
-            segment.x === pos.x &&
-            segment.y === pos.y
+          (segment) => segment.x === pos.x && segment.y === pos.y
         );
 
       return validPosition && noBodyCollision;
@@ -48,29 +44,26 @@ class Snake {
 
     // A* pathfinding implementation
     const findPath = () => {
-      // Define possible moves
       const possibleMoves = [
-        { x: 1, y: 0 }, // Right
-        { x: 0, y: 1 }, // Down
-        { x: -1, y: 0 }, // Left
-        { x: 0, y: -1 }, // Up
+        { x: 1, y: 0 },
+        { x: 0, y: 1 },
+        { x: -1, y: 0 },
+        { x: 0, y: -1 },
       ];
 
-      // Normalize position for wrap-around grid
+      // Normalize position considering wrap-around
       const normalizePos = (pos) => {
-        // Only normalize if invincible, otherwise keep original position
         if (this.invincible) {
           return {
             x: (pos.x + this.gridWidth) % this.gridWidth,
             y: (pos.y + this.gridHeight) % this.gridHeight,
           };
         }
-        return { ...pos }; // Return copy of original position if not invincible
+        return { ...pos };
       };
 
-      // Calculate Manhattan distance considering wrap-around
+      // Calculate Manhattan distance with wrap-around consideration
       const getDistance = (pos1, pos2) => {
-        // If invincible, consider wrap-around distances
         if (this.invincible) {
           const dx = Math.min(
             Math.abs(pos1.x - pos2.x),
@@ -81,32 +74,92 @@ class Snake {
             this.gridHeight - Math.abs(pos1.y - pos2.y)
           );
           return dx + dy;
-        } else {
-          // Standard Manhattan distance when not invincible
-          return Math.abs(pos1.x - pos2.x) + Math.abs(pos1.y - pos2.y);
         }
+        return Math.abs(pos1.x - pos2.x) + Math.abs(pos1.y - pos2.y);
       };
 
-      // Check if we can directly move to food (for simple cases)
-      for (const move of possibleMoves) {
-        const nextPos = {
-          x: head.x + move.x,
-          y: head.y + move.y,
+      // Check if a position is trapped (surrounded by snake body)
+      const isTrapped = (pos) => {
+        return possibleMoves.every((move) => {
+          const nextPos = {
+            x: pos.x + move.x,
+            y: pos.y + move.y,
+          };
+          return !isSafePosition(nextPos);
+        });
+      };
+
+      // Find available space in the grid
+      const getAvailableSpace = () => {
+        let space = 0;
+        const visited = new Set();
+
+        const floodFill = (pos) => {
+          const key = `${pos.x},${pos.y}`;
+          if (visited.has(key)) return;
+          if (!isSafePosition(pos)) return;
+
+          visited.add(key);
+          space++;
+
+          for (const move of possibleMoves) {
+            floodFill({
+              x: pos.x + move.x,
+              y: pos.y + move.y,
+            });
+          }
         };
 
-        // Only normalize if invincible
-        const normalizedPos = normalizePos(nextPos);
+        floodFill(head);
+        return space;
+      };
 
-        if (
-          normalizedPos.x === foodPos.x &&
-          normalizedPos.y === foodPos.y &&
-          isSafePosition(normalizedPos)
-        ) {
-          return move; // Direct path to food
+      // Score a move based on various factors
+      const scoreMovePosition = (pos, move) => {
+        let score = 0;
+
+        // Distance to food
+        const currentDistance = getDistance(head, foodPos);
+        const newDistance = getDistance(pos, foodPos);
+        if (newDistance < currentDistance) {
+          score += 10;
         }
-      }
 
-      // Find best move using a combination of safety and distance heuristics
+        // Available space after move
+        const availableSpace = getAvailableSpace();
+        const requiredSpace = this.body.length * 1.5; // Need more space than snake length
+        score += (availableSpace / requiredSpace) * 20;
+
+        // Avoid trapping self
+        if (isTrapped(pos)) {
+          score -= 100;
+        }
+
+        // Prefer moves away from walls when not invincible
+        if (!this.invincible) {
+          const distanceToWall = Math.min(
+            pos.x,
+            this.gridWidth - 1 - pos.x,
+            pos.y,
+            this.gridHeight - 1 - pos.y
+          );
+          score += distanceToWall * 2;
+        }
+
+        // Prefer continuing in same direction
+        if (move.x === this.direction.x && move.y === this.direction.y) {
+          score += 5;
+        }
+
+        // Avoid immediate reversal
+        if (move.x === -this.direction.x && move.y === -this.direction.y) {
+          score -= 50;
+        }
+
+        return score;
+      };
+
+      // Find best move
       let bestMove = null;
       let bestScore = -Infinity;
 
@@ -116,101 +169,40 @@ class Snake {
           y: head.y + move.y,
         };
 
-        // Check if position is safe before normalizing
-        if (!isSafePosition(nextPos)) {
-          continue; // Skip unsafe moves
-        }
+        if (!isSafePosition(nextPos)) continue;
 
-        // Calculate score based on multiple factors
-        let score = 0;
+        const score = scoreMovePosition(nextPos, move);
 
-        // Distance to food (higher score for moves that get closer)
-        const currentDistance = getDistance(head, foodPos);
-        const newDistance = getDistance(nextPos, foodPos);
-
-        if (newDistance < currentDistance) {
-          score += 10; // Significant bonus for getting closer
-        }
-
-        // Check if this move leads to a dead end
-        const futureOptions = possibleMoves.filter((futureMove) => {
-          const futurePos = {
-            x: nextPos.x + futureMove.x,
-            y: nextPos.y + futureMove.y,
-          };
-          return isSafePosition(futurePos);
-        });
-
-        // Add score based on future move options (avoid dead ends)
-        score += futureOptions.length * 5;
-
-        // Avoid moving in opposite direction of current direction
-        // (prevents unnecessary back-and-forth movement)
-        if (!(move.x === -this.direction.x && move.y === -this.direction.y)) {
-          score += 2;
-        }
-
-        // Prefer continuing in same direction when possible
-        if (move.x === this.direction.x && move.y === this.direction.y) {
-          score += 3;
-        }
-
-        // Extra caution near walls when not invincible
-        if (!this.invincible) {
-          const distanceToWall = Math.min(
-            nextPos.x,
-            this.gridWidth - 1 - nextPos.x,
-            nextPos.y,
-            this.gridHeight - 1 - nextPos.y
-          );
-
-          // Add score for positions further from walls
-          score += distanceToWall;
-        }
-
-        // Update best move if this score is higher
         if (score > bestScore) {
           bestScore = score;
           bestMove = move;
         }
       }
 
-      return bestMove;
+      // If no good move found, try to find any safe move that maximizes space
+      if (!bestMove) {
+        let maxSpace = -1;
+
+        for (const move of possibleMoves) {
+          const nextPos = {
+            x: head.x + move.x,
+            y: head.y + move.y,
+          };
+
+          if (!isSafePosition(nextPos)) continue;
+
+          const space = getAvailableSpace();
+          if (space > maxSpace) {
+            maxSpace = space;
+            bestMove = move;
+          }
+        }
+      }
+
+      return bestMove || this.direction; // Fall back to current direction if no move found
     };
 
-    // Try to find a path
-    const bestMove = findPath();
-
-    // If no good move found, try to find any safe move
-    if (!bestMove) {
-      const possibleMoves = [
-        { x: 1, y: 0 }, // Right
-        { x: 0, y: 1 }, // Down
-        { x: -1, y: 0 }, // Left
-        { x: 0, y: -1 }, // Up
-      ];
-
-      // Filter to only safe moves
-      const safeMoves = possibleMoves.filter((move) => {
-        const nextPos = {
-          x: head.x + move.x,
-          y: head.y + move.y,
-        };
-
-        // Only normalize if invincible
-        if (this.invincible) {
-          nextPos.x = (nextPos.x + this.gridWidth) % this.gridWidth;
-          nextPos.y = (nextPos.y + this.gridHeight) % this.gridHeight;
-        }
-
-        return isSafePosition(nextPos);
-      });
-
-      // Return any safe move or current direction if none found
-      return safeMoves.length > 0 ? safeMoves[0] : this.direction;
-    }
-
-    return bestMove;
+    return findPath();
   }
 
   update() {
