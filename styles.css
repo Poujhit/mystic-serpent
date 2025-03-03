@@ -362,3 +362,27 @@ body {
   position: relative;
   overflow: visible;
 }
+
+/* Food timer disclaimer */
+.food-timer-info {
+  color: #ff6666;
+  font-size: 0.7em;
+  text-align: center;
+  margin-bottom: 10px;
+  padding: 5px;
+  border: 1px dashed #ff6666;
+  border-radius: 4px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.7;
+  }
+}
