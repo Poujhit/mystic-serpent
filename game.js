@@ -24,14 +24,13 @@ class Snake {
 
     // Helper function to check if a position is safe
     const isSafePosition = (pos) => {
-      // During auto-pilot, always check boundaries regardless of invincibility
       const validPosition =
         pos.x >= 0 &&
         pos.x < this.gridWidth &&
         pos.y >= 0 &&
         pos.y < this.gridHeight;
 
-      // During auto-pilot, always check body collisions regardless of ghost mode
+      // During auto-pilot, always check body collisions
       const noBodyCollision = !this.body.some(
         (segment) => segment.x === pos.x && segment.y === pos.y
       );
@@ -39,7 +38,62 @@ class Snake {
       return validPosition && noBodyCollision;
     };
 
-    // A* pathfinding implementation
+    // Check if a move would create a dangerous pattern
+    const isDangerousPattern = (nextPos) => {
+      const bodyMap = new Set(this.body.map((pos) => `${pos.x},${pos.y}`));
+
+      // Check surrounding positions
+      const surroundingPositions = [
+        { x: nextPos.x + 1, y: nextPos.y },
+        { x: nextPos.x - 1, y: nextPos.y },
+        { x: nextPos.x, y: nextPos.y + 1 },
+        { x: nextPos.x, y: nextPos.y - 1 },
+      ];
+
+      // Count body parts and walls around the position
+      let blockedCount = 0;
+      for (const pos of surroundingPositions) {
+        if (!isSafePosition(pos) || bodyMap.has(`${pos.x},${pos.y}`)) {
+          blockedCount++;
+        }
+      }
+
+      // Position is dangerous if it has more than 2 blocked sides
+      return blockedCount > 2;
+    };
+
+    // Calculate available space using flood fill
+    const getAvailableSpace = (startPos) => {
+      let space = 0;
+      const visited = new Set();
+
+      const floodFill = (pos) => {
+        const key = `${pos.x},${pos.y}`;
+        if (visited.has(key)) return;
+        if (!isSafePosition(pos)) return;
+
+        visited.add(key);
+        space++;
+
+        const moves = [
+          { x: 1, y: 0 },
+          { x: 0, y: 1 },
+          { x: -1, y: 0 },
+          { x: 0, y: -1 },
+        ];
+
+        for (const move of moves) {
+          floodFill({
+            x: pos.x + move.x,
+            y: pos.y + move.y,
+          });
+        }
+      };
+
+      floodFill(startPos);
+      return space;
+    };
+
     const findPath = () => {
       const possibleMoves = [
         { x: 1, y: 0 },
@@ -48,53 +102,18 @@ class Snake {
         { x: 0, y: -1 },
       ];
 
-      // Normalize position without considering wrap-around during auto-pilot
-      const normalizePos = (pos) => ({ ...pos });
-
-      // Calculate Manhattan distance without wrap-around during auto-pilot
       const getDistance = (pos1, pos2) => {
         return Math.abs(pos1.x - pos2.x) + Math.abs(pos1.y - pos2.y);
-      };
-
-      // Check if a position is trapped (surrounded by snake body)
-      const isTrapped = (pos) => {
-        return possibleMoves.every((move) => {
-          const nextPos = {
-            x: pos.x + move.x,
-            y: pos.y + move.y,
-          };
-          return !isSafePosition(nextPos);
-        });
-      };
-
-      // Find available space in the grid
-      const getAvailableSpace = () => {
-        let space = 0;
-        const visited = new Set();
-
-        const floodFill = (pos) => {
-          const key = `${pos.x},${pos.y}`;
-          if (visited.has(key)) return;
-          if (!isSafePosition(pos)) return;
-
-          visited.add(key);
-          space++;
-
-          for (const move of possibleMoves) {
-            floodFill({
-              x: pos.x + move.x,
-              y: pos.y + move.y,
-            });
-          }
-        };
-
-        floodFill(head);
-        return space;
       };
 
       // Score a move based on various factors
       const scoreMovePosition = (pos, move) => {
         let score = 0;
+
+        // Heavy penalty for dangerous patterns
+        if (isDangerousPattern(pos)) {
+          score -= 200;
+        }
 
         // Distance to food
         const currentDistance = getDistance(head, foodPos);
@@ -103,41 +122,44 @@ class Snake {
           score += 10;
         }
 
-        // Available space after move
-        const availableSpace = getAvailableSpace();
-        const requiredSpace = this.body.length * 1.5;
-        score += (availableSpace / requiredSpace) * 20;
+        // Available space after move - very important factor
+        const availableSpace = getAvailableSpace(pos);
+        const requiredSpace = this.body.length * 2;
+        const spaceScore = (availableSpace / requiredSpace) * 40;
+        score += spaceScore;
 
-        // Avoid trapping self
-        if (isTrapped(pos)) {
-          score -= 100;
+        // Heavily penalize moves that lead to very limited space
+        if (availableSpace < this.body.length * 1.5) {
+          score -= 300;
         }
 
-        // Always prefer moves away from walls during auto-pilot
+        // Prefer moves away from walls
         const distanceToWall = Math.min(
           pos.x,
           this.gridWidth - 1 - pos.x,
           pos.y,
           this.gridHeight - 1 - pos.y
         );
-        score += distanceToWall * 2;
+        score += distanceToWall * 3;
 
-        // Prefer continuing in same direction
+        // Prefer continuing in same direction to avoid zigzagging
         if (move.x === this.direction.x && move.y === this.direction.y) {
-          score += 5;
+          score += 8;
         }
 
-        // Avoid immediate reversal
+        // Heavy penalty for immediate reversal
         if (move.x === -this.direction.x && move.y === -this.direction.y) {
-          score -= 50;
+          score -= 100;
         }
 
         return score;
       };
 
-      // Find best move
       let bestMove = null;
       let bestScore = -Infinity;
+
+      // First try to find a move that doesn't decrease available space
+      const currentSpace = getAvailableSpace(head);
 
       for (const move of possibleMoves) {
         const nextPos = {
@@ -147,35 +169,32 @@ class Snake {
 
         if (!isSafePosition(nextPos)) continue;
 
-        const score = scoreMovePosition(nextPos, move);
-
-        if (score > bestScore) {
-          bestScore = score;
-          bestMove = move;
-        }
-      }
-
-      // If no good move found, try to find any safe move that maximizes space
-      if (!bestMove) {
-        let maxSpace = -1;
-
-        for (const move of possibleMoves) {
-          const nextPos = {
-            x: head.x + move.x,
-            y: head.y + move.y,
-          };
-
-          if (!isSafePosition(nextPos)) continue;
-
-          const space = getAvailableSpace();
-          if (space > maxSpace) {
-            maxSpace = space;
+        const newSpace = getAvailableSpace(nextPos);
+        if (newSpace >= currentSpace * 0.8) {
+          // Allow slight space reduction
+          const score = scoreMovePosition(nextPos, move);
+          if (score > bestScore) {
+            bestScore = score;
             bestMove = move;
           }
         }
       }
 
-      return bestMove || this.direction; // Fall back to current direction if no move found
+      // If no good moves found, try any safe move
+      if (!bestMove) {
+        for (const move of possibleMoves) {
+          const nextPos = {
+            x: head.x + move.x,
+            y: head.y + move.y,
+          };
+          if (isSafePosition(nextPos)) {
+            bestMove = move;
+            break;
+          }
+        }
+      }
+
+      return bestMove || this.direction;
     };
 
     return findPath();
@@ -574,9 +593,10 @@ class Game {
       ghost: { active: false, timeLeft: 0 },
       invincible: { active: false, timeLeft: 0 },
       double: { active: false, timeLeft: 0 },
-      ultimate: { active: false, timeLeft: 0 },
       cursed: { active: false, timeLeft: 0 },
+      ultimate: { active: false, timeLeft: 0 },
     };
+    this.autoPilotInvincibilityExtension = 5000; // 5 seconds extension
     this.lastTime = Date.now();
     this.paused = false;
     this.highScore = localStorage.getItem('snakeHighScore') || 0;
@@ -730,53 +750,23 @@ class Game {
     this.snake.ghostMode = this.powerUps.ghost.active;
     this.snake.invincible = this.powerUps.invincible.active;
 
-    if (!this.waitingForInput) {
-      // Normal snake update
-      const updateResult = this.snake.update();
-      if (
-        (!this.snake.invincible && !updateResult) ||
-        (this.powerUps.cursed.active && !updateResult)
-      ) {
-        this.handleGameOver();
-        return;
-      }
-    } else {
-      // When waiting for input, keep moving in last valid direction
-      const head = { ...this.snake.body[0] };
-      head.x += this.lastValidDirection.x;
-      head.y += this.lastValidDirection.y;
+    const updateResult = this.snake.update();
 
-      // Handle wall collisions while waiting for input
-      if (
-        head.x < 0 ||
-        head.x >= this.snake.gridWidth ||
-        head.y < 0 ||
-        head.y >= this.snake.gridHeight
-      ) {
-        if (this.snake.invincible) {
-          head.x = (head.x + this.snake.gridWidth) % this.snake.gridWidth;
-          head.y = (head.y + this.snake.gridHeight) % this.snake.gridHeight;
-        } else {
-          // If not invincible, stop at the wall
-          head.x = Math.max(0, Math.min(head.x, this.snake.gridWidth - 1));
-          head.y = Math.max(0, Math.min(head.y, this.snake.gridHeight - 1));
-          // Stop moving in this direction
-          this.lastValidDirection = { x: 0, y: 0 };
-        }
+    // End game if collision occurs during cursed mode or when not invincible
+    if (
+      (!this.snake.invincible && !updateResult) ||
+      (this.powerUps.cursed.active && !updateResult) // This ensures cursed mode ends game on any collision
+    ) {
+      // End cursed mode immediately
+      if (this.powerUps.cursed.active) {
+        this.powerUps.cursed.active = false;
+        this.powerUps.cursed.timeLeft = 0;
+        document.body.classList.remove('cursed-mode');
+        this.canvas.classList.remove('cursed');
       }
 
-      // Check for self collision
-      const willCollide = this.snake.body.some(
-        (segment) => segment.x === head.x && segment.y === head.y
-      );
-
-      if (!willCollide || this.snake.ghostMode) {
-        this.snake.body.unshift(head);
-        this.snake.body.pop();
-      } else {
-        // Stop moving if would collide with self
-        this.lastValidDirection = { x: 0, y: 0 };
-      }
+      this.handleGameOver();
+      return;
     }
 
     // Check for food collection
@@ -846,6 +836,13 @@ class Game {
     // Only call grow once and set animation time
     this.snake.growthAnimation = Date.now();
     this.food.randomize();
+
+    // If ultimate (auto-pilot) power-up is collected, also activate invincibility
+    if (this.food.type === 'ultimate') {
+      this.activatePowerUp('ultimate', 15000);
+      this.activatePowerUp('invincible', 15000); // Same duration as auto-pilot
+      this.snake.autoPilot = true;
+    }
   }
 
   createFoodCollectionEffect(pos, foodType) {
@@ -955,6 +952,12 @@ class Game {
             // Keep the snake moving in the last valid direction
             this.snake.direction = { ...this.lastValidDirection };
             this.snake.nextDirection = { ...this.lastValidDirection };
+
+            // Extend invincibility for 5 more seconds
+            this.powerUps.invincible.timeLeft =
+              this.autoPilotInvincibilityExtension;
+            this.powerUps.invincible.active = true;
+            this.snake.invincible = true;
           }
         }
       }
@@ -1223,6 +1226,7 @@ class Game {
     message.innerHTML = `
       <div>🎮 AUTO-PILOT ENDED 🎮</div>
       <div style="font-size: 0.8em; margin-top: 5px;">Press a direction key to resume</div>
+      <div style="font-size: 0.7em; color: #ffff00;">Invincibility: 5s</div>
     `;
     container.appendChild(message);
 
