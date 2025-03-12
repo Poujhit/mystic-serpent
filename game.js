@@ -837,11 +837,15 @@ class Game {
     this.snake.growthAnimation = Date.now();
     this.food.randomize();
 
-    // If ultimate (auto-pilot) power-up is collected, also activate invincibility
+    // If ultimate (auto-pilot) power-up is collected, also activate invincibility and ghost mode
     if (this.food.type === 'ultimate') {
       this.activatePowerUp('ultimate', 15000);
       this.activatePowerUp('invincible', 15000); // Same duration as auto-pilot
+      this.activatePowerUp('ghost', 15000); // Add ghost mode
       this.snake.autoPilot = true;
+
+      // Add visual indication for auto-pilot mode
+      this.canvas.classList.add('auto-pilot-mode');
     }
   }
 
@@ -944,9 +948,13 @@ class Game {
           } else if (type === 'invincible') {
             this.snake.invincible = false;
           } else if (type === 'ultimate') {
+            // Remove auto-pilot visual indication
+            this.canvas.classList.remove('auto-pilot-mode');
+
             // Store the last valid direction before stopping
             this.lastValidDirection = { ...this.snake.direction };
             this.snake.autoPilot = false;
+            this.snake.ghostMode = false; // Disable ghost mode
             this.waitingForInput = true;
             this.showAutoEndMessage();
             // Keep the snake moving in the last valid direction
@@ -967,42 +975,99 @@ class Game {
   draw() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // If cursed mode is active, darken the entire website first
-    if (this.powerUps.cursed.active) {
-      document.body.classList.add('cursed-mode');
-      // Hide canvas border during cursed mode
-      this.canvas.classList.add('cursed');
-    } else {
-      document.body.classList.remove('cursed-mode');
-      this.canvas.classList.remove('cursed');
+    // Draw board border
+    this.ctx.strokeStyle = this.snake.autoPilot ? '#00ffff' : '#2ecc71';
+    this.ctx.lineWidth = 2;
+    this.ctx.strokeRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Draw snake with special styling during auto-pilot
+    this.ctx.save();
+    if (this.snake.autoPilot) {
+      // Add a glow effect for auto-pilot mode
+      this.ctx.shadowColor = '#00ffff'; // Cyan glow
+      this.ctx.shadowBlur = 15;
     }
 
-    // Draw auto-pilot countdown in background first
-    if (this.powerUps.ultimate.active) {
-      const timeLeft = Math.ceil(this.powerUps.ultimate.timeLeft / 1000);
-      this.ctx.save();
-      this.ctx.fillStyle = 'rgba(255, 215, 0, 0.1)';
-      this.ctx.font = 'bold 120px Arial';
-      this.ctx.textAlign = 'center';
-      this.ctx.textBaseline = 'middle';
-      const centerX = this.canvas.width / 2;
-      const centerY = this.canvas.height / 2;
-      this.ctx.shadowColor = 'rgba(255, 215, 0, 0.3)';
-      this.ctx.shadowBlur = 20;
-      this.ctx.fillText(timeLeft.toString(), centerX, centerY);
-      this.ctx.restore();
-    }
+    // Draw snake body
+    this.ctx.fillStyle = this.snake.autoPilot ? '#00ffff' : '#2ecc71';
+    this.snake.body.forEach((segment, index) => {
+      const x = segment.x * this.snake.gridSize;
+      const y = segment.y * this.snake.gridSize;
+      const size = this.snake.gridSize;
 
-    // Draw snake and food first
-    if (this.powerUps.ghost.active) {
-      this.ctx.globalAlpha = 0.5;
-    }
-    if (this.powerUps.invincible.active) {
-      this.snake.draw(this.ctx, '#ffd700');
-    } else {
-      this.snake.draw(this.ctx);
-    }
-    this.ctx.globalAlpha = 1;
+      // Different rendering for head and body
+      if (index === 0) {
+        // Head with rounded corners and eyes
+        this.ctx.fillStyle = this.snake.autoPilot ? '#00ffff' : '#2ecc71';
+        this.ctx.beginPath();
+        this.ctx.roundRect(x, y, size, size, [5]);
+        this.ctx.fill();
+
+        // Eyes
+        this.ctx.fillStyle = 'black';
+        const eyeSize = size / 5;
+        const eyeOffset = size / 4;
+
+        // Determine eye direction
+        if (this.snake.direction.x === 1) {
+          // Looking right
+          this.ctx.fillRect(
+            x + size - eyeOffset,
+            y + eyeOffset,
+            eyeSize,
+            eyeSize
+          );
+          this.ctx.fillRect(
+            x + size - eyeOffset,
+            y + size - eyeOffset * 2,
+            eyeSize,
+            eyeSize
+          );
+        } else if (this.snake.direction.x === -1) {
+          // Looking left
+          this.ctx.fillRect(x + eyeOffset, y + eyeOffset, eyeSize, eyeSize);
+          this.ctx.fillRect(
+            x + eyeOffset,
+            y + size - eyeOffset * 2,
+            eyeSize,
+            eyeSize
+          );
+        } else if (this.snake.direction.y === 1) {
+          // Looking down
+          this.ctx.fillRect(
+            x + eyeOffset,
+            y + size - eyeOffset,
+            eyeSize,
+            eyeSize
+          );
+          this.ctx.fillRect(
+            x + size - eyeOffset * 2,
+            y + size - eyeOffset,
+            eyeSize,
+            eyeSize
+          );
+        } else {
+          // Looking up
+          this.ctx.fillRect(x + eyeOffset, y + eyeOffset, eyeSize, eyeSize);
+          this.ctx.fillRect(
+            x + size - eyeOffset * 2,
+            y + eyeOffset,
+            eyeSize,
+            eyeSize
+          );
+        }
+      } else {
+        // Body segments with rounded corners
+        this.ctx.fillStyle = this.snake.autoPilot ? '#00a0a0' : '#27ae60';
+        this.ctx.beginPath();
+        this.ctx.roundRect(x, y, size, size, [3]);
+        this.ctx.fill();
+      }
+    });
+
+    this.ctx.restore();
+
+    // Draw food
     this.food.draw(this.ctx);
 
     // Create dark overlay if cursed mode is active
