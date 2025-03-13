@@ -601,6 +601,9 @@ class Game {
     this.paused = false;
     this.highScore = localStorage.getItem('snakeHighScore') || 0;
     document.getElementById('highScore').textContent = this.highScore;
+    this.lives = 3; // Initialize with 3 lives
+    this.livesElement = document.getElementById('lives');
+    this.updateLivesDisplay();
 
     // Update the keydown event listener to prevent scrolling
     document.addEventListener('keydown', (e) => {
@@ -680,11 +683,11 @@ class Game {
       KeyD: () => ({ x: 1, y: 0 }),
     };
 
-    // Handle input after auto-pilot ends
+    // Handle input after life lost or auto-pilot ends
     if (this.waitingForInput && keyActions[event.code]) {
       const newDirection = keyActions[event.code]();
 
-      // Check if the new direction is valid (not opposite to last valid direction)
+      // Only resume if the new direction is valid
       if (
         !(
           this.lastValidDirection &&
@@ -694,7 +697,7 @@ class Game {
       ) {
         this.waitingForInput = false;
         this.snake.nextDirection = newDirection;
-        this.snake.direction = { ...this.lastValidDirection }; // Keep current direction until next update
+        this.snake.direction = { ...newDirection };
         this.lastValidDirection = null;
       }
       return;
@@ -752,10 +755,10 @@ class Game {
 
     const updateResult = this.snake.update();
 
-    // End game if collision occurs during cursed mode or when not invincible
+    // Check for collision
     if (
       (!this.snake.invincible && !updateResult) ||
-      (this.powerUps.cursed.active && !updateResult) // This ensures cursed mode ends game on any collision
+      (this.powerUps.cursed.active && !updateResult)
     ) {
       // End cursed mode immediately
       if (this.powerUps.cursed.active) {
@@ -765,7 +768,8 @@ class Game {
         this.canvas.classList.remove('cursed');
       }
 
-      this.handleGameOver();
+      // Lose a life instead of ending game immediately
+      this.loseLife();
       return;
     }
 
@@ -808,11 +812,13 @@ class Game {
         break;
       case 'ultimate':
         points = 25;
-        // Only activate autopilot if not already in autopilot mode
-        if (!this.snake.autoPilot) {
-          this.snake.autoPilot = true;
-          this.activatePowerUp('ultimate', 20000);
-        }
+        // Activate auto-pilot and related power-ups
+        this.activatePowerUp('ultimate', 15000);
+        this.activatePowerUp('invincible', 15000);
+        this.activatePowerUp('ghost', 15000);
+        this.snake.autoPilot = true;
+        // Add visual indication for auto-pilot mode
+        this.canvas.classList.add('auto-pilot-mode');
         break;
       case 'shrink':
         if (this.snake.body.length > 5 && this.snake.shrink()) {
@@ -836,17 +842,6 @@ class Game {
     // Only call grow once and set animation time
     this.snake.growthAnimation = Date.now();
     this.food.randomize();
-
-    // If ultimate (auto-pilot) power-up is collected, also activate invincibility and ghost mode
-    if (this.food.type === 'ultimate') {
-      this.activatePowerUp('ultimate', 15000);
-      this.activatePowerUp('invincible', 15000); // Same duration as auto-pilot
-      this.activatePowerUp('ghost', 15000); // Add ghost mode
-      this.snake.autoPilot = true;
-
-      // Add visual indication for auto-pilot mode
-      this.canvas.classList.add('auto-pilot-mode');
-    }
   }
 
   createFoodCollectionEffect(pos, foodType) {
@@ -982,14 +977,29 @@ class Game {
 
     // Draw snake with special styling during auto-pilot
     this.ctx.save();
+
+    // Add visual effects based on active power-ups
     if (this.snake.autoPilot) {
-      // Add a glow effect for auto-pilot mode
-      this.ctx.shadowColor = '#00ffff'; // Cyan glow
+      // Auto-pilot effect (cyan glow)
+      this.ctx.shadowColor = '#00ffff';
       this.ctx.shadowBlur = 15;
+    } else if (this.snake.invincible && this.snake.ghostMode) {
+      // Combined invincible + ghost effect (rainbow pulsing glow)
+      const hue = ((Date.now() % 1000) / 1000) * 360;
+      this.ctx.shadowColor = `hsl(${hue}, 100%, 70%)`;
+      this.ctx.shadowBlur = 15;
+    } else if (this.snake.invincible) {
+      // Invincible effect (yellow/gold glow)
+      this.ctx.shadowColor = '#ffcc00';
+      this.ctx.shadowBlur = 12;
+    } else if (this.snake.ghostMode) {
+      // Ghost effect (blue glow and transparency)
+      this.ctx.shadowColor = '#6666ff';
+      this.ctx.shadowBlur = 10;
+      this.ctx.globalAlpha = 0.7; // Make snake semi-transparent in ghost mode
     }
 
     // Draw snake body
-    this.ctx.fillStyle = this.snake.autoPilot ? '#00ffff' : '#2ecc71';
     this.snake.body.forEach((segment, index) => {
       const x = segment.x * this.snake.gridSize;
       const y = segment.y * this.snake.gridSize;
@@ -998,7 +1008,20 @@ class Game {
       // Different rendering for head and body
       if (index === 0) {
         // Head with rounded corners and eyes
-        this.ctx.fillStyle = this.snake.autoPilot ? '#00ffff' : '#2ecc71';
+        if (this.snake.autoPilot) {
+          this.ctx.fillStyle = '#00ffff'; // Cyan for auto-pilot
+        } else if (this.snake.invincible && this.snake.ghostMode) {
+          // Rainbow effect for combined powers
+          const hue = ((Date.now() % 1000) / 1000) * 360;
+          this.ctx.fillStyle = `hsl(${hue}, 100%, 70%)`;
+        } else if (this.snake.invincible) {
+          this.ctx.fillStyle = '#ffcc00'; // Gold for invincible
+        } else if (this.snake.ghostMode) {
+          this.ctx.fillStyle = '#6666ff'; // Blue for ghost mode
+        } else {
+          this.ctx.fillStyle = '#2ecc71'; // Default green
+        }
+
         this.ctx.beginPath();
         this.ctx.roundRect(x, y, size, size, [5]);
         this.ctx.fill();
@@ -1058,7 +1081,20 @@ class Game {
         }
       } else {
         // Body segments with rounded corners
-        this.ctx.fillStyle = this.snake.autoPilot ? '#00a0a0' : '#27ae60';
+        if (this.snake.autoPilot) {
+          this.ctx.fillStyle = '#00a0a0'; // Darker cyan for auto-pilot
+        } else if (this.snake.invincible && this.snake.ghostMode) {
+          // Slightly darker rainbow for body
+          const hue = ((Date.now() % 1000) / 1000) * 360;
+          this.ctx.fillStyle = `hsl(${hue}, 90%, 60%)`;
+        } else if (this.snake.invincible) {
+          this.ctx.fillStyle = '#e6b800'; // Darker gold for invincible
+        } else if (this.snake.ghostMode) {
+          this.ctx.fillStyle = '#5555dd'; // Darker blue for ghost mode
+        } else {
+          this.ctx.fillStyle = '#27ae60'; // Default darker green
+        }
+
         this.ctx.beginPath();
         this.ctx.roundRect(x, y, size, size, [3]);
         this.ctx.fill();
@@ -1157,6 +1193,8 @@ class Game {
     this.scoreElement.textContent = this.score;
     this.gameOver = false;
     this.gameOverElement.classList.add('hidden');
+    this.lives = 3; // Reset lives
+    this.updateLivesDisplay();
   }
 
   togglePause() {
@@ -1302,6 +1340,78 @@ class Game {
         clearInterval(checkAndRemove);
       }
     }, 100);
+  }
+
+  loseLife() {
+    this.lives--;
+    this.updateLivesDisplay();
+
+    // Reduce score by 300 points, but not below 0
+    this.score = Math.max(0, this.score - 300);
+    this.scoreElement.textContent = this.score;
+
+    // Show life lost animation/effect
+    this.showLifeLostEffect();
+
+    if (this.lives <= 0) {
+      // No more lives, game over
+      this.handleGameOver();
+    } else {
+      // Reset snake position but keep length
+      this.resetAfterLifeLost();
+    }
+  }
+
+  resetAfterLifeLost() {
+    // Keep snake length but reset position to center
+    const snakeLength = this.snake.body.length;
+    this.snake.reset(snakeLength);
+
+    // Give player a moment to recover
+    this.waitingForInput = true;
+    this.lastValidDirection = { x: 0, y: 0 }; // Stop movement
+
+    // Show continue message
+    this.showContinueMessage();
+  }
+
+  showLifeLostEffect() {
+    // Flash the screen red
+    const overlay = document.createElement('div');
+    overlay.className = 'life-lost-overlay';
+    document.querySelector('.screen-bezel').appendChild(overlay);
+
+    // Remove after animation
+    setTimeout(() => {
+      if (overlay.parentNode) {
+        overlay.parentNode.removeChild(overlay);
+      }
+    }, 1000);
+  }
+
+  showContinueMessage() {
+    const container = document.getElementById('activePowerUps');
+    const message = document.createElement('div');
+    message.className = 'power-up-indicator life-lost';
+    message.innerHTML = `
+      <div>❤️ LIFE LOST! ❤️</div>
+      <div style="font-size: 0.8em; margin-top: 5px;">Press any direction to continue</div>
+      <div style="font-size: 0.7em; color: #ff6666;">-300 points</div>
+    `;
+    container.appendChild(message);
+
+    // Keep message visible until user input
+    const checkAndRemove = setInterval(() => {
+      if (!this.waitingForInput && message.parentNode === container) {
+        container.removeChild(message);
+        clearInterval(checkAndRemove);
+      }
+    }, 100);
+  }
+
+  updateLivesDisplay() {
+    this.livesElement.innerHTML =
+      '❤️'.repeat(this.lives) + '🖤'.repeat(3 - this.lives);
   }
 }
 
