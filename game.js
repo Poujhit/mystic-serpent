@@ -699,6 +699,12 @@ class Game {
         this.snake.nextDirection = newDirection;
         this.snake.direction = { ...newDirection };
         this.lastValidDirection = null;
+
+        // Restore original score for speed calculation after player resumes
+        if (this.tempScoreForSpeed !== undefined) {
+          this.score = this.tempScoreForSpeed;
+          this.tempScoreForSpeed = undefined;
+        }
       }
       return;
     }
@@ -726,13 +732,9 @@ class Game {
       return this.autoEndingSpeed;
     }
 
-    // If waiting for input and snake is stopped, use normal speed but don't move
-    if (
-      this.waitingForInput &&
-      this.lastValidDirection.x === 0 &&
-      this.lastValidDirection.y === 0
-    ) {
-      return this.baseSpeed; // Keep normal update speed but snake won't move
+    // If waiting for input, use base speed (but snake won't move until input)
+    if (this.waitingForInput) {
+      return this.baseSpeed;
     }
 
     // Normal speed calculation
@@ -1366,6 +1368,22 @@ class Game {
     // Keep snake length but reset position to center
     const snakeLength = this.snake.body.length;
     this.snake.reset(snakeLength);
+
+    // Reset all power-ups
+    for (const type in this.powerUps) {
+      this.powerUps[type].active = false;
+      this.powerUps[type].timeLeft = 0;
+    }
+
+    // Reset snake state
+    this.snake.ghostMode = false;
+    this.snake.invincible = false;
+    this.snake.autoPilot = false;
+
+    // Remove any visual effects
+    this.canvas.classList.remove('auto-pilot-mode');
+    document.body.classList.remove('cursed-mode');
+    this.canvas.classList.remove('cursed');
 
     // Give player a moment to recover
     this.waitingForInput = true;
